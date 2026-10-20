@@ -1,0 +1,25 @@
+# 解决中文乱码
+chcp 65001 | Out-Null
+
+$errorFound = $false
+# 执行 Kettle 作业
+& E:\WEB\kettle\pdi-ce-9.5.0.0-SNAPSHOT\data-integration\Kitchen -rep:workList -user:admin -pass:admin -job:NEX_WIPPROFILE.dbo.PROFILE_TECH_CUT_COMMENT -dir:/MST_FLOW/  -lever:basic 2>&1 | ForEach-Object {
+    # 实时显示日志到控制台
+    Write-Host $_
+    
+    # 检测关键词：ERROR 或 结果=[false]
+    if ($_ -match "ERROR|结果\s*=\s*$$false$$") {
+          # 高亮显示匹配行
+        Write-Host "[检测到问题] $_" -ForegroundColor Red
+        $errorFound = $true
+    }
+}
+
+# 根据错误标志设置退出码
+if ($errorFound -or $LASTEXITCODE -ne 0) {
+ Write-Host "## 作业执行失败，退出码: 1" -ForegroundColor Red
+    exit 1
+} else {
+Write-Host "## 作业执行成功，退出码: 0" -ForegroundColor Green
+    exit 0
+}
