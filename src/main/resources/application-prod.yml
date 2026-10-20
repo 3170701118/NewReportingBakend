@@ -1,0 +1,22 @@
+server:
+  port: 8000
+  servlet:
+    context-path: /api
+
+druid:
+  common: &druid-common
+    # 连接有效性配置
+    validation-query: SELECT 1 FROM DUAL
+    validation-query-timeout: 1
+    test-while-idle: true
+    test-on-borrow: false
+    test-on-return: false
+
+    # 连接回收策略
+    time-between-eviction-runs-millis: 30000  # 30秒检测一次
+    min-evictable-idle-time-millis: 120000    # 空闲2分钟回收
+
+    # 泄漏检测 - 生产环境建议禁用或谨慎使用
+    remove-abandoned: false  # 改为false或根据需要调整
+    # remove-abandoned-timeout: 30              # 如需开启，建议更长时间
+    # log-abandoned: true

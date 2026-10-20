@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.CVDCleanMonitorMapper">
+
+    <select id="getN1A1ToolIdList" resultType="string">
+        SELECT  replace(EQP_ID,'.','_')TOOL_ID
+        FROM PWEB.EQP_ID_USE_STD
+        WHERE SUBSTR(EQP_ID,1,1) IN ('D','M') AND INSTR(EQP_ID,'.')&gt;0
+        AND ACTIVE_FLAG ='Y'
+    </select>
+
+    <select id="getN1A3ToolIdList" resultType="string">
+        SELECT  replace(EQP_ID,'.','_')TOOL_ID
+        FROM PWEB.EQP_ID_USE_STD
+        WHERE SUBSTR(EQP_ID,1,1) IN ('D','M') AND INSTR(EQP_ID,'.')>0
+        AND ACTIVE_FLAG ='Y'
+    </select>
+
+    <insert id="insertFDCMoveInfo">
+        INSERT ALL
+        <foreach collection="list" item="item" separator="" >
+            INTO A1_MFG.TF_CVD_CLN_INFO(FAB,TOOL_NAME,TOOL_ID,PARTITION_ID,RUN_ID,START_TIME,END_TIME,BATCH_ID,CARRIER_ID,DATA_QUALITY,LOT_ID,RECIPE_NAME,WAFER_ID,LOT_TYPE,MES_RECIPE_ID,OPER_ID,OPER_NO,PORT_ID,PRODUCT_ID,PRODUCT_OP_CODE,ROUTE_ID,SLOT_NO,STAGE_ID,UPDATE_TIME)
+            VALUES(#{fab,jdbcType=VARCHAR},#{item.TOOL_NAME,jdbcType=VARCHAR},#{item.TOOL_ID,jdbcType=VARCHAR},#{item.PARTITION_ID,jdbcType=VARCHAR} , #{item.RUN_ID,jdbcType=VARCHAR} ,TO_DATE(REPLACE(REPLACE(#{item.RunStartTime,jdbcType=VARCHAR},'AM','上午'),'PM','下午'), 'MM/DD/YYYY HH:MI:SS AM') ,TO_DATE(REPLACE(REPLACE(#{item.RunEndTime,jdbcType=VARCHAR},'AM','上午'),'PM','下午'), 'MM/DD/YYYY HH:MI:SS AM') ,#{item.BATCH_ID,jdbcType=VARCHAR} ,#{item.CARRIER_ID,jdbcType=VARCHAR} ,#{item.DATA_QUALITY,jdbcType=VARCHAR} ,#{item.LOT_ID,jdbcType=VARCHAR} ,#{item.RECIPE_NAME,jdbcType=VARCHAR},#{item.WAFER_ID,jdbcType=VARCHAR} ,#{item.LOT_TYPE,jdbcType=VARCHAR},#{item.MES_RECIPE_ID,jdbcType=VARCHAR} ,#{item.OPER_ID,jdbcType=VARCHAR} ,#{item.OPER_NO,jdbcType=VARCHAR} ,#{item.PORT_ID,jdbcType=VARCHAR} ,#{item.PRODUCT_ID,jdbcType=VARCHAR} ,#{item.Product__OP_code,jdbcType=VARCHAR} ,#{item.ROUTE_ID,jdbcType=VARCHAR} ,#{item.SLOT_NO,jdbcType=VARCHAR} ,#{item.STAGE_ID,jdbcType=VARCHAR} ,SYSDATE)
+        </foreach>
+        SELECT 1 FROM DUAL
+    </insert>
+
+    <delete id="deleteFDCMoveInfo">
+        DELETE  FROM A1_MFG.TF_CVD_CLN_INFO A
+        WHERE EXISTS (
+        SELECT 1 FROM(
+        SELECT TOOL_ID,PARTITION_ID,RUN_ID,START_TIME,UPDATE_TIME FROM(
+        SELECT
+        A.* ,ROW_NUMBER()OVER(PARTITION BY TOOL_ID,PARTITION_ID,RUN_ID,START_TIME ORDER BY UPDATE_TIME)RN
+        FROM A1_MFG.TF_CVD_CLN_INFO A
+        WHERE  FAB = #{fab,jdbcType=VARCHAR}
+        )WHERE RN>1
+        UNION ALL
+        SELECT TOOL_ID,PARTITION_ID,RUN_ID,START_TIME,UPDATE_TIME FROM A1_MFG.TF_CVD_CLN_INFO WHERE  FAB = #{fab,jdbcType=VARCHAR} AND START_TIME &lt;  SYSDATE-8
+        )B  WHERE A.TOOL_ID = B.TOOL_ID AND A.PARTITION_ID = B.PARTITION_ID AND A.RUN_ID = B.RUN_ID AND A.START_TIME = B.START_TIME AND A.UPDATE_TIME = B.UPDATE_TIME
+        )
+    </delete>
+
+
+</mapper>

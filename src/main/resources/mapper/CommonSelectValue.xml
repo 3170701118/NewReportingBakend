@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.CommonSelectValueMapper">
+
+    <select id="getMenuList" resultType="java.util.Map">
+        SELECT ROUTE_NAME,MENU_NAME FROM A1MFG.SYS_MENU_LIST
+        WHERE MENU_TYPE ='page' AND (PATH LIKE '%n1mfg%' OR UPPER(PATH) NOT LIKE '%HTTP%' or PATH LIKE '%10.51.184.201%')
+    </select>
+
+    <select id="getFunctionOwnerList" resultType="java.util.Map">
+        SELECT EMP_ID,CNAME,EMAIL FROM WORKFLOW.HR_USERS
+        WHERE QUIT_DATE IS NULL AND BYWORK ='0'
+        AND EMAIL IS NOT NULL
+        <if test="query!= null and query!= ''">
+            AND (EMP_ID LIKE CONCAT(#{query},'%')
+            OR CNAME LIKE CONCAT('%',CONCAT(#{query},'%')) OR EMAIL LIKE CONCAT('%',CONCAT(#{query},'%')))
+        </if>
+        <if test="query=='' or query == null">
+            AND (DEPT_ID = 'PB11' OR DEPT_ID = 'PH11' OR DEPT_ID = 'PT11')
+        </if>
+    </select>
+
+
+    <select id="getAllCnames" resultType="java.util.Map">
+        SELECT EMP_ID,CNAME,EMAIL FROM WORKFLOW.HR_USERS
+            WHERE QUIT_DATE IS NULL AND BYWORK ='0' AND EMAIL IS NOT NULL AND DEPT_ID = 'PB11'
+    </select>
+
+    <select id="getAllSdepts" resultType="java.util.Map">
+        SELECT DISTINCT DEPT_ID,SDEPT_CNAME,DEPT_CNAME FROM WORKFLOW.HR_USERS
+        WHERE QUIT_DATE IS NULL AND BYWORK ='0' AND EMAIL IS NOT NULL AND SDEPT_CNAME IS NOT NULL AND DEPT_CNAME IS NOT NULL
+    </select>
+
+    <select id="getAllDepts" resultType="java.util.Map">
+        SELECT DISTINCT DEPT_ID,DEPT_CNAME FROM WORKFLOW.HR_USERS
+        WHERE QUIT_DATE IS NULL AND BYWORK ='0' AND EMAIL IS NOT NULL AND SDEPT_CNAME IS NOT NULL
+    </select>
+
+    <select id="getAllSDeptList" resultType="java.util.Map">
+        SELECT
+        DEPT_ID||DECODE(SUBDEPT_ID,NULL,NULL,'-')|| DECODE(SUBDEPT_ID,NULL,NULL,SUBDEPT_ID) SDEPT_ID,
+        DEPT_CNAME||DECODE(SDEPT_CNAME,NULL,NULL,'(')||DECODE(SDEPT_CNAME,NULL,NULL,SDEPT_CNAME)||DECODE(SDEPT_CNAME,NULL,NULL,')')SDEPT_CNAME
+        FROM(
+        SELECT DISTINCT DEPT_ID,SUBDEPT_ID,DEPT_CNAME,SDEPT_CNAME  FROM WORKFLOW.HR_USERS  WHERE QUIT_DATE IS NULL AND BYWORK ='0' AND EMAIL IS NOT NULL
+        )
+    </select>
+</mapper>

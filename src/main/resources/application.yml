@@ -1,0 +1,173 @@
+logging:
+  config: classpath:loback-config.xml ##自定义的配置文件名
+spring:
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+  application:
+    name: NewReporting
+  profiles:
+    active: @profiles.active@
+  jackson:
+    # 不要全局限制，避免字段格式不一致
+    date-format: "yyyy-MM-dd HH:mm:ss"
+    locale: zh_CN
+    time-zone: GMT+8
+  autoconfigure:
+    exclude: com.alibaba.druid.spring.boot.autoconfigure.DruidDataSourceAutoConfigure
+  # druid config
+  datasource:
+    hikari:
+      connection-timeout: 30000  # 增加连接超时时间
+      max-lifetime: 600000        # 最大生命周期
+      maximum-pool-size: 20       # 根据实际情况调整
+      idle-timeout: 300000        # 空闲超时时间
+    druid:
+      filter:
+        slf4j:
+          enabled: false
+        wall:
+          enabled: false
+      web-stat-filter:
+        enabled: false
+
+
+      # 动态扩容策略
+      auto-scale:
+        enabled: true
+        max-limit: 100       # 最大允许扩容到的连接数
+        step: 5              # 每次扩容步长
+        threshold-wait: 10   # 等待线程数阈值触发扩容
+
+      # 熔断配置
+      circuit-breaker:
+        failure-threshold: 50%  # 错误率阈值
+        duration: 30s           # 熔断持续时间
+        min-calls: 20           # 最小统计样本
+
+      #监控
+      stat-view-servlet:
+        enabled: true
+        url-pattern: /druid/*
+        login-username: admin
+        login-password: monitor123
+
+# 公共Druid配置（针对200并发优化）
+druid:
+  common: &druid-common
+    not-full-timeout-retry-count: 5   # 获取连接重试次数
+    type: com.alibaba.druid.pool.DruidDataSource
+    # 连接池核心配置
+    initial-size: 15                     # 初始连接数（较温和的预热）
+    min-idle: 15                         # 最小空闲连接
+    max-active: 80                       # 最大连接数（按Oracle标准进程数配置）
+    max-wait: 5000                       # 获取连接超时2秒（快速失败）
+
+    # 连接有效性配置
+    validation-query: SELECT 1 FROM DUAL
+    validation-query-timeout: 3
+    test-while-idle: true
+    test-on-borrow: true
+    test-on-return: false
+
+    # 连接回收策略
+    time-between-eviction-runs-millis: 20000  # 20秒检测一次
+    min-evictable-idle-time-millis: 300000    # 空闲5分钟回收
+
+    # 泄漏检测（关键！）
+    remove-abandoned: true
+    remove-abandoned-timeout: 500              # 30秒未关闭视为泄漏
+    log-abandoned: true
+
+    # 监控和性能
+    filters: stat,slf4j
+    connection-properties:
+      druid.stat.mergeSql: true
+      druid.stat.slowSqlMillis: 1000           # 1000ms视为慢SQL
+      druid.stat.logSlowSql: true
+
+    # Oracle专属优化
+    oracle:
+      pool-prepared-statements: true          # 启用预处理语句池
+      max-pool-prepared-statement-per-connection-size: 30  # 增加预处理语句池大小
+      # dblink专用优化
+      db-link-timeout: 5000                    # dblink超时设置
+      distributed-lock-timeout: 100           # 分布式锁超时
+
+  # 自动扩展配置
+  auto-scale:
+    enabled: true
+    max-limit: 100       # 最大允许扩容到的连接数
+    step: 5              # 每次扩容步长
+    threshold-wait: 10   # 等待线程数阈值触发扩容
+
+mybatis-flex:
+  datasource:
+    pdw:
+      <<: *druid-common  # 引用锚点
+      driver-class-name: oracle.jdbc.OracleDriver
+      url: jdbc:oracle:thin:@//10.51.184.6:1521/pdw
+      username: pweb
+      password: nex
+      # 可覆盖公共配置
+      max-active: 60                          # 主业务库适当增大
+    pdwmfg:
+      <<: *druid-common  # 引用锚点
+      driver-class-name: oracle.jdbc.OracleDriver
+      url: jdbc:oracle:thin:@//10.51.184.6:1521/pdw
+      username: a1mfg
+      password: A1mfgPB11
+    a3pdw:
+      <<: *druid-common  # 引用锚点
+      driver-class-name: oracle.jdbc.OracleDriver
+      url: jdbc:oracle:thin:@//10.53.192.125:1521/A3PPDW
+      username: A12_MFG
+      password: A3pDwMFG12
+    a3mfg:
+      <<: *druid-common  # 引用锚点
+      driver-class-name: oracle.jdbc.OracleDriver
+      url: jdbc:oracle:thin:@//10.53.195.242:1521/A3PMFG
+      username: A1_MFG
+      password: Nexmfg_12
+    ocs:
+      <<: *druid-common  # 引用锚点
+      driver-class-name: oracle.jdbc.OracleDriver
+      url: jdbc:oracle:thin:@//10.51.80.190:1521/OCS_PROD
+      username: rd_pb11_01
+      password: rd_pb11_01
+
+  global-config:
+    print-banner: true
+    logic-delete-column: deleted
+    normal-value-of-logic-delete: 0
+    deleted-value-of-logic-delete: 1
+    version-column: version
+  mapper-locations:
+    - classpath*:/mapper/*.xml
+  type-aliases-package: mfg.reporting.pojo, mfg.reporting.dto
+  map-underscore-to-camel-case: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      pdw-db:
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        minimumNumberOfCalls: 20
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+custom:
+  manageFileSaveLocation: file/Manager/RtWelcome_mfgFileManage/
+  uploadFileSaveLocation:  file/Upload/
+  templateFileSaveLocation: file/Template/
+  clickLogLocation: logs/click/

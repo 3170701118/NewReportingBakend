@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.PageManageMFGMapper">
+
+    <select id="getPageManageMFGList" resultType="java.util.Map">
+        WITH PARENT_MENU_INFO AS(
+        SELECT TITLE,MENU_ID,PARENT_MENU_ID,LINK,DESCRIPTION,SEQ,UPDATE_USER
+        FROM A1MFG.PAGE_MANAGER_MFG
+        WHERE MODULE =#{module} and PARENT_MENU_ID IS NULL
+        <if test="parentMenuId != ''">
+            AND MENU_ID = #{parentMenuId}
+        </if>
+        )
+        SELECT TITLE,MENU_ID,PARENT_MENU_ID,LINK,DESCRIPTION,SEQ,UPDATE_USER
+        FROM A1MFG.PAGE_MANAGER_MFG A
+        WHERE MODULE =#{module} AND EXISTS(
+        SELECT 1 FROM(
+        SELECT MENU_ID FROM PARENT_MENU_INFO
+        )B WHERE A.PARENT_MENU_ID = B.MENU_ID
+        )
+        UNION ALL
+        SELECT TITLE,MENU_ID,PARENT_MENU_ID,LINK,DESCRIPTION,SEQ,UPDATE_USER  FROM PARENT_MENU_INFO
+    </select>
+
+    <select id="updateMenuName">
+        UPDATE A1MFG.PAGE_MANAGER_MFG
+        SET TITLE = #{menuName}
+        WHERE MENU_ID = #{menuId}
+    </select>
+
+    <select id="insertPageManageLink">
+        INSERT INTO A1MFG.PAGE_MANAGER_MFG (MENU_ID, PARENT_MENU_ID, TITLE, LINK, DESCRIPTION, SEQ, MODULE,UPDATE_USER, UPDATE_TIME)
+        VALUES (#{MODULE}||TO_CHAR(SYSDATE,'YYYYMMDDHH24MISS'), #{MENU_ID}, #{TITLE}, #{LINK}, #{DESCRIPTION,jdbcType=VARCHAR}, #{SEQ}, #{MODULE},#{UPDATE_USER}, SYSDATE)
+    </select>
+
+    <select id="updatePageManageLink">
+        UPDATE A1MFG.PAGE_MANAGER_MFG
+        SET  TITLE = #{TITLE}, LINK = #{LINK}, DESCRIPTION = #{DESCRIPTION,jdbcType=VARCHAR}, SEQ = #{SEQ}, UPDATE_USER = #{UPDATE_USER}, UPDATE_TIME = SYSDATE
+        WHERE MENU_ID = #{MENU_ID}
+    </select>
+
+    <select id="deletePageManageLink">
+        DELETE FROM A1MFG.PAGE_MANAGER_MFG
+        WHERE MENU_ID = #{menuId}
+    </select>
+</mapper>

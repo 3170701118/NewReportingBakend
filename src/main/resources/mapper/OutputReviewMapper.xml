@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.OutputReviewMapper">
+
+    <select id="getOutputSummary" resultType="map">
+        SELECT SHIFT_DATE,FAB,OUTPUT_PLAN,OUTPUT_DAILY,MAKEUP_PLAN,ACT_OUTPUT,DAILY_DIFF,ACC_DIFF FROM(
+        SELECT SHIFT_DATE,NVL(FAB,'N1')FAB,SUM(OUTPUT_PLAN)OUTPUT_PLAN
+        ,SUM(OUTPUT_DAILY)OUTPUT_DAILY
+        ,SUM(MAKEUP_PLAN)MAKEUP_PLAN
+        ,SUM(ACT_OUTPUT)ACT_OUTPUT
+        ,SUM(DAILY_DIFF)DAILY_DIFF
+        ,MAX(UPDATE_TIME) UPDATE_TIME
+        ,SUM(ACC_DIFF)ACC_DIFF FROM A1_MFG.OUTPUT_REVIEW_MONITOR
+        WHERE  SHIFT_MONTH =#{month,jdbcType=VARCHAR}
+        GROUP BY ROLLUP(fab),SHIFT_DATE
+        )
+        WHERE FAB =#{fab,jdbcType=VARCHAR}
+    </select>
+
+    <select id="getOutputSummaryByeqpg" resultType="map">
+        SELECT SHIFT_DATE,SHIFT_MONTH,FAB,A.EQP_G
+        ,CASE
+        WHEN SHIFT_MONTH = '202609' AND A.EQP_G = 'DG_PETEOS' AND SHIFT_DATE &gt;= '20260920' AND FAB ='N1A1' THEN 42000
+        WHEN SHIFT_MONTH = '202609' AND A.EQP_G = 'DG_PETEOS' AND SHIFT_DATE &gt;= '20260920' AND FAB ='N1A3' THEN 28000
+        WHEN SHIFT_MONTH = '202609' AND  A.EQP_G = 'DG_PETEOS' AND SHIFT_DATE &gt;= '20260920' AND FAB ='N1' THEN 70000
+        WHEN SHIFT_MONTH = '202609' AND A.EQP_G = 'EM_AL_AG' AND SHIFT_DATE &gt;= '20260923' AND SHIFT_DATE &lt;= '20260927' AND FAB ='N1A1' THEN 4200
+        WHEN SHIFT_MONTH = '202609' AND A.EQP_G = 'EM_AL_AG' AND SHIFT_DATE &gt;= '20260923' AND SHIFT_DATE &lt;= '20260927' AND FAB ='N1A3' THEN 1400
+        WHEN SHIFT_MONTH = '202609' AND  A.EQP_G = 'EM_AL_AG' AND SHIFT_DATE &gt;= '20260923' AND SHIFT_DATE &lt;= '20260927' AND FAB ='N1' THEN 5600
+        ELSE  C.BASIC_TARGET END BASIC_TARGET
+        ,TO_CHAR(MAX(CASE WHEN SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD') OR SHIFT_DATE = TO_CHAR(ADD_MONTHS(TO_DATE(#{month},'YYYYMM'),1)-1,'YYYYMMDD') THEN UTIL_TARGET END)OVER(PARTITION BY FAB,SHIFT_MONTH),'FM999990.0')  UTIL_TARGET
+        ,TO_CHAR(MAX(CASE WHEN SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD') OR SHIFT_DATE = TO_CHAR(ADD_MONTHS(TO_DATE(#{month},'YYYYMM'),1)-1,'YYYYMMDD') THEN UPTIME_TARGET END)OVER(PARTITION BY FAB,SHIFT_MONTH),'FM999990.0') UPTIME_TARGET
+        ,TO_CHAR(MAX(CASE WHEN SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD') OR SHIFT_DATE = TO_CHAR(ADD_MONTHS(TO_DATE(#{month},'YYYYMM'),1)-1,'YYYYMMDD') THEN EFF_TARGET END)OVER(PARTITION BY FAB,SHIFT_MONTH),'FM999990.0') EFF_TARGET
+        ,CASE WHEN SHIFT_DATE &lt;= TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD')
+        THEN SUM( NVL(A.ACT_MOVE,0) -
+        CASE
+        WHEN SHIFT_MONTH = '202609' AND A.EQP_G = 'DG_PETEOS' AND SHIFT_DATE &gt;= '20260920' AND FAB ='N1A1' THEN 42000
+        WHEN SHIFT_MONTH = '202609' AND A.EQP_G = 'DG_PETEOS' AND SHIFT_DATE &gt;= '20260920' AND FAB ='N1A3' THEN 28000
+        WHEN SHIFT_MONTH = '202609' AND  A.EQP_G = 'DG_PETEOS' AND SHIFT_DATE &gt;= '20260920' AND FAB ='N1' THEN 70000
+        WHEN SHIFT_MONTH = '202609' AND A.EQP_G = 'EM_AL_AG' AND SHIFT_DATE &gt;= '20260923' AND SHIFT_DATE &lt;= '20260927' AND FAB ='N1A1' THEN 4200
+        WHEN SHIFT_MONTH = '202609' AND A.EQP_G = 'EM_AL_AG' AND SHIFT_DATE &gt;= '20260923' AND SHIFT_DATE &lt;= '20260927' AND FAB ='N1A3' THEN 1400
+        WHEN SHIFT_MONTH = '202609' AND  A.EQP_G = 'EM_AL_AG' AND SHIFT_DATE &gt;= '20260923' AND SHIFT_DATE &lt;= '20260927' AND FAB ='N1' THEN 5600
+        ELSE  C.BASIC_TARGET END
+        )OVER(PARTITION BY 1 ORDER BY SHIFT_DATE) END + NVL(C.BEGIN_MOVE,0) ACC_MOVE
+        ,MNG_FLAG
+        ,CASE WHEN SHIFT_DATE &lt;= TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD') AND B.MNG_FLAG ='Y' THEN NVL(MNG_AVG_TIME,0)
+        WHEN SHIFT_DATE &lt;= TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD') THEN ROUND(AVG_TIME,1) END AVG_TIME
+        ,B.MNG_FLAG
+        ,CASE WHEN SHIFT_DATE &lt;= TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD') THEN NVL(ACT_MOVE,0) ELSE ACT_MOVE END ACT_MOVE
+        ,CASE WHEN SHIFT_DATE &lt;= TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD') THEN TO_CHAR(NVL(EFF,0),'FM999990.0') ELSE TO_CHAR(EFF,'FM999990.0') END EFF
+        ,CASE WHEN SHIFT_DATE &lt;= TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD') THEN TO_CHAR(NVL(UTIL,0),'FM999990.0') ELSE TO_CHAR(UTIL,'FM999990.0') END UTIL
+        ,CASE WHEN SHIFT_DATE &lt;= TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD') THEN TO_CHAR(NVL(UPTIME,0),'FM999990.0') ELSE TO_CHAR(UPTIME,'FM999990.0') END UPTIME
+        ,CASE WHEN SHIFT_DATE &lt;= TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD') AND B.MNG_FLAG ='Y' THEN NVL(MNG_WIP,0)
+        WHEN SHIFT_DATE &lt;= TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD') THEN NVL(WIP,0) END WIP
+        FROM
+        A1_MFG.OUTPUT_REVIEW_EQPG_SUMMARY_INFO A
+        LEFT JOIN (
+        SELECT KEY1 EQP_G,KEY2 MODULE ,KEY3 MNG_FLAG FROM A1_MFG.COMMENT_SUMMARY  WHERE FUNCTION_NAME ='OUTPUT_REVIEW_EQPG_MAINTAIN'
+        AND KEY1 = #{eqpg,jdbcType=VARCHAR}
+        )B
+        ON A.EQP_G = B.EQP_G
+        LEFT JOIN (
+        SELECT
+        EQP_G,BASIC_TARGET,BEGIN_MOVE
+        FROM (
+        SELECT
+        NVL(FAB,'N1') FAB,EQP_G,SUM(NVL(MENU_TARGET,BASIC_TARGET))BASIC_TARGET,SUM(BEGIN_MOVE)BEGIN_MOVE
+        FROM  A1_MFG.OUTPUT_REVIEW_EQPG_MOVE_TARGET
+        WHERE SHIFT_MONTH = #{month,jdbcType=VARCHAR} AND EQP_G = #{eqpg,jdbcType=VARCHAR}
+        GROUP BY ROLLUP(FAB),EQP_G
+        )WHERE FAB = #{fab,jdbcType=VARCHAR}
+        )C
+        ON A.EQP_G = C.EQP_G
+        WHERE A.SHIFT_MONTH = #{month,jdbcType=VARCHAR}
+        AND A.EQP_G = #{eqpg,jdbcType=VARCHAR} AND A.FAB =#{fab,jdbcType=VARCHAR}
+    </select>
+
+    <select id="getMaintaineqpg" resultType="java.util.HashMap">
+        SELECT KEY1 label,key1 value,NVL(key4,'N') flag FROM A1_MFG.COMMENT_SUMMARY
+        WHERE FUNCTION_NAME = 'OUTPUT_REVIEW_EQPG_MAINTAIN'
+        AND KEY2 =#{module,jdbcType=VARCHAR}
+        <if test="FLAG != null and FLAG !=''">
+            AND nvl(key4,'N') = 'Y'
+        </if>
+        ORDER BY DECODE(NVL(key4,'N'),'Y',1,2), UPDATE_TIME
+    </select>
+
+
+
+    <select id="testMaintaineqpg" resultType="map">
+        SELECT 1 FROM(
+        SELECT DISTINCT EQP_G FROM PWEB.EQP_ID_USE_STD@A1PDW  WHERE MODULE = #{MODULE,jdbcType=VARCHAR} AND EQP_G = #{EQP_G,jdbcType=VARCHAR}
+        UNION
+        SELECT DISTINCT EQP_G FROM PWEB.EQP_ID_USE_STD@A3PDW  WHERE MODULE = #{MODULE,jdbcType=VARCHAR} AND EQP_G = #{EQP_G,jdbcType=VARCHAR}
+        )A LEFT JOIN
+        (
+        SELECT KEY1 EQP_G,KEY2 MODULE  FROM A1_MFG.COMMENT_SUMMARY WHERE FUNCTION_NAME = 'OUTPUT_REVIEW_EQPG_MAINTAIN'
+        )B
+        ON A.EQP_G = B.EQP_G
+        WHERE A.EQP_G IS NOT NULL AND B.EQP_G IS NULL
+    </select>
+
+    <insert id="insertMaintaineqpg">
+        INSERT INTO A1_MFG.COMMENT_SUMMARY(FUNCTION_NAME,KEY1,KEY2,KEY3,KEY4,UPDATE_TIME,UPDATE_USER)
+        VALUES('OUTPUT_REVIEW_EQPG_MAINTAIN',#{EQP_G,jdbcType=VARCHAR},#{MODULE,jdbcType=VARCHAR},#{MNG_FLAG,jdbcType=VARCHAR},#{FLAG,jdbcType=VARCHAR},sysdate,#{username,jdbcType=VARCHAR})
+    </insert>
+
+
+    <update id="updateMaintainEqpg">
+        update A1_MFG.COMMENT_SUMMARY set KEY4 = #{FLAG,jdbcType=VARCHAR},UPDATE_TIME = sysdate,UPDATE_USER = #{username,jdbcType=VARCHAR}
+        where FUNCTION_NAME = 'OUTPUT_REVIEW_EQPG_MAINTAIN'
+        and KEY1 = #{EQP_G,jdbcType=VARCHAR} and KEY2 = #{MODULE,jdbcType=VARCHAR}
+    </update>
+
+    <delete id="deleteMaintaineqpg">
+        DELETE FROM A1_MFG.COMMENT_SUMMARY WHERE FUNCTION_NAME = 'OUTPUT_REVIEW_EQPG_MAINTAIN'
+        AND KEY1 = #{EQP_G,jdbcType=VARCHAR} AND KEY2 = #{MODULE,jdbcType=VARCHAR}
+    </delete>
+
+
+    <select id="getkeyinSummary" resultType="map">
+        SELECT A.TECH,A.EQP_G,B.WAFER_QTY,B.WAFER_K FROM(
+        SELECT 'Cap' TECH ,#{eqpg,jdbcType=VARCHAR}EQP_G FROM DUAL
+        UNION ALL
+        SELECT 'Request' TECH ,#{eqpg,jdbcType=VARCHAR} EQP_G  FROM DUAL
+        )A LEFT JOIN (
+        SELECT
+        EQP_G,WAFER_QTY,WAFER_K,TECH
+        FROM(
+        SELECT EQP_G,CAP_WAFER WAFER_QTY,CAP_K WAFER_K ,'Cap' TECH FROM A1_MFG.OUTPUT_REVIEW_KEYIN_COMMENT
+        WHERE SHIFT_MONTH=#{month,jdbcType=VARCHAR}
+        UNION ALL
+        SELECT EQP_G,REQ_WAFER WAFER_QTY,REQ_K WAFER_K ,'Request' TECH FROM A1_MFG.OUTPUT_REVIEW_KEYIN_COMMENT
+        WHERE SHIFT_MONTH=#{month,jdbcType=VARCHAR}
+        ))B
+        ON A.TECH  = B.TECH  AND A.EQP_G = B.EQP_G
+    </select>
+
+    <update id="updateCapQTY">
+        merge into
+        A1_MFG.OUTPUT_REVIEW_KEYIN_COMMENT t
+        using (
+        select #{EQP_G,jdbcType=VARCHAR} EQP_G,#{WAFER_QTY,jdbcType=VARCHAR} WAFER_QTY,#{WAFER_K,jdbcType=VARCHAR} WAFER_K
+        ,#{UPD_USER,jdbcType=VARCHAR} UPD_USER
+        from dual
+        )s
+        on (t.EQP_G = s.EQP_G)
+        when matched then update set t.CAP_WAFER = s.WAFER_QTY,t.CAP_K = s.WAFER_K,t.UPDATE_USER = s.UPD_USER,t.UPDATE_TIME = sysdate
+        when not matched then insert (EQP_G,CAP_WAFER,CAP_K,UPDATE_USER,UPDATE_TIME) values (s.EQP_G,s.WAFER_QTY,s.WAFER_K,s.UPD_USER,sysdate)
+    </update>
+
+    <update id="updateReqQTY">
+        merge into
+        A1_MFG.OUTPUT_REVIEW_KEYIN_COMMENT t
+        using (
+        select #{EQP_G,jdbcType=VARCHAR} EQP_G,#{WAFER_QTY,jdbcType=VARCHAR} WAFER_QTY,#{WAFER_K,jdbcType=VARCHAR} WAFER_K
+        ,#{UPD_USER,jdbcType=VARCHAR} UPD_USER
+        from dual
+        )s
+        on (t.EQP_G = s.EQP_G)
+        when matched then update set t.REQ_WAFER = s.WAFER_QTY,t.REQ_K = s.WAFER_K,t.UPDATE_USER = s.UPD_USER,t.UPDATE_TIME = sysdate
+        when not matched then insert (EQP_G,REQ_WAFER,REQ_K,UPDATE_USER,UPDATE_TIME) values (s.EQP_G,s.WAFER_QTY,s.WAFER_K,s.UPD_USER,sysdate)
+    </update>
+
+    <select id="getComment" resultType="map">
+        SELECT EQP_G,F_COMMENT,F_COMMENT2 ,VERSION
+        FROM A1_MFG.OUTPUT_REVIEW_KEYIN_COMMENT
+        WHERE EQP_G = #{eqpg,jdbcType=VARCHAR} AND SHIFT_MONTH=#{curMonth,jdbcType=VARCHAR}
+    </select>
+
+    <update id="updateComment">
+        merge into
+        A1_MFG.OUTPUT_REVIEW_KEYIN_COMMENT t
+        using (
+        select #{EQP_G,jdbcType=VARCHAR} EQP_G, #{F_COMMENT,jdbcType=VARCHAR} F_COMMENT, #{F_COMMENT2,jdbcType=VARCHAR} F_COMMENT2
+        ,#{VERSION,jdbcType=VARCHAR} VERSION
+        ,#{UPD_USER,jdbcType=VARCHAR} UPD_USER
+        from dual
+        )s
+        ON (t.EQP_G = s.EQP_G)
+        WHEN MATCHED THEN
+        UPDATE SET
+        t.F_COMMENT = s.F_COMMENT,
+        t.F_COMMENT2 = s.F_COMMENT2,
+        t.UPDATE_USER = s.UPD_USER,
+        t.UPDATE_TIME = SYSDATE,
+        t.VERSION = s.VERSION + 1
+        WHERE nvl(t.VERSION, 0) = s.VERSION
+        WHEN NOT MATCHED THEN
+        INSERT (EQP_G, F_COMMENT, F_COMMENT2, UPDATE_USER, UPDATE_TIME, VERSION)
+        VALUES (s.EQP_G, s.F_COMMENT, s.F_COMMENT2, s.UPD_USER, SYSDATE, 1)
+    </update>
+
+
+    <select id="getMakeUpPlanList" resultType="map">
+        SELECT
+        KEY1 FAB,KEY2 SHIFT_DATE,KEY3 MAKEUP_PLAN
+        FROM A1_MFG.COMMENT_SUMMARY WHERE FUNCTION_NAME = 'OUTPUT_MAKEUP_PLAN_PC'
+            AND substr(KEY2,1,6) = #{month,jdbcType=VARCHAR}
+        ORDER BY KEY1,KEY2
+    </select>
+
+    <select id="insertMakeUpplan">
+        merge into
+        A1_MFG.COMMENT_SUMMARY t
+        using (
+        <foreach collection="list" separator=" UNION ALL " item="item">
+            select 'OUTPUT_MAKEUP_PLAN_PC' FUNCTION_NAME,
+            #{item.FAB,jdbcType=VARCHAR} FAB,#{item.SHIFT_DATE,jdbcType=VARCHAR} SHIFT_DATE,#{item.MAKEUP_PLAN,jdbcType=VARCHAR} MAKEUP_PLAN
+            ,#{username,jdbcType=VARCHAR} UPD_USER
+            from dual
+        </foreach>
+        )s
+        on (t.KEY1 = s.FAB AND t.KEY2 = s.SHIFT_DATE AND T.FUNCTION_NAME = S.FUNCTION_NAME)
+        when matched then update set t.KEY3 = s.MAKEUP_PLAN,t.UPDATE_USER = s.UPD_USER,t.UPDATE_TIME = sysdate
+        when not matched then insert (FUNCTION_NAME,KEY1,KEY2,KEY3,UPDATE_USER,UPDATE_TIME) values (s.FUNCTION_NAME,s.FAB,s.SHIFT_DATE,s.MAKEUP_PLAN,s.UPD_USER,sysdate)
+    </select>
+
+
+    <select id="getModuleeqpgRequstTarget" resultType="map">
+        SELECT SHIFT_MONTH,FAB,EQP_G,BASIC_TARGET,MENU_TARGET FROM  A1_MFG.OUTPUT_REVIEW_EQPG_MOVE_TARGET
+        WHERE SHIFT_MONTH =#{month,jdbcType=VARCHAR} AND EQP_G = #{EQP_G,jdbcType=VARCHAR}
+
+    </select>
+
+    <update id="updateModuleeqpgMenuTarget">
+        UPDATE A1_MFG.OUTPUT_REVIEW_EQPG_MOVE_TARGET
+        SET MENU_TARGET = #{MENU_TARGET,jdbcType=INTEGER},UPDATE_TIME = sysdate,UPDATE_USER = #{UPD_USER,jdbcType=VARCHAR}
+        WHERE SHIFT_MONTH = #{SHIFT_MONTH,jdbcType=VARCHAR} AND EQP_G = #{EQP_G,jdbcType=VARCHAR}
+        AND FAB = #{FAB,jdbcType=VARCHAR}
+    </update>
+
+
+
+
+</mapper>

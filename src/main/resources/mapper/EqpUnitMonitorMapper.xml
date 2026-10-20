@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.EqpUnitMonitorMapper">
+
+    <resultMap id="eqpUnitMap" type="mfg.reporting.pojo.EqpUnitMonitorPO">
+        <result column="EQP_G" property="eqpG"/>
+        <result column="EQP_ID" property="eqpId"/>
+        <result column="MODULE" property="module"/>
+        <result column="ALARM_CODE" property="alarmCode"/>
+        <result column="UNIT_ID" property="unitId"/>
+        <result column="UNIT_FLAG" property="unitFlag"/>
+        <result column="OCCUR_TIME" property="occurTime"/>
+        <result column="EQP_STATUS" property="eqpStatus"/>
+        <result column="EQP_E10" property="eqpE10"/>
+        <result column="UNIT_STATUS" property="unitStatus"/>
+        <result column="UNIT_E10" property="unitE10"/>
+        <result column="UNIT_JUDGE" property="unitJudge"/>
+        <result column="F_COMMENT" property="fcomment"/>
+    </resultMap>
+
+
+    <select id="getEqpUnitMonitorInfo" resultMap="eqpUnitMap">
+        WITH EQP_STATUS_INFO AS(
+        SELECT
+        EQP_G,CASE WHEN CHAMBER IS NOT NULL THEN EQP_ID||'.'||CHAMBER ELSE EQP_ID END EQP_ID
+        ,PREV_STATE,PREV_E10_STATE_CODE
+        FROM(
+        SELECT DISTINCT
+        EQP_G,EQP_ID,CASE WHEN LENGTH(CHAMBER)=1 OR LENGTH(CHAMBER)=3 OR CHAMBER IS NULL THEN CHAMBER
+        ELSE REGEXP_REPLACE(CHAMBER, '\d', '') END CHAMBER
+        ,PREV_STATE,PREV_E10_STATE_CODE
+        FROM(
+        SELECT EQP_G
+        ,CASE WHEN INSTR(EQP_ID,'.')&gt;0 THEN SUBSTR(EQP_ID,1,INSTR(EQP_ID,'.')-1) ELSE EQP_ID END EQP_ID
+        ,CASE WHEN INSTR(EQP_ID,'.')&gt;0 THEN SUBSTR(EQP_ID,INSTR(EQP_ID,'.')+1) END CHAMBER
+        ,PREV_STATE,PREV_E10_STATE_CODE
+        FROM PWEB.EQP_ID_STATUS_DAILY WHERE SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD')
+        ))),BASE_INFO AS(
+        SELECT EQP_G,EQP_ID,MODULE,ALARM_CODE,UNIT_ID,UNIT_FLAG,OCCUR_TIME
+        ,EQP_ID ||'.'||UNIT_ID UNIT_LINK1
+        ,CASE WHEN UNIT_ID LIKE 'CH%' THEN EQP_ID ||'.'||REPLACE(UNIT_ID,'CH','') END UNIT_LINK2
+        FROM(
+        SELECT
+        C.*,ROW_NUMBER()OVER(PARTITION BY EQP_ID,UNIT_ID ORDER BY OCCUR_TIME DESC)RN
+        FROM(
+        SELECT
+        A.*,B.ALARM_CODE
+        ,SUBSTR(ALARM_TEXT2,1,INSTR(ALARM_TEXT2,'_')-1)UNIT_ID
+        ,SUBSTR(ALARM_TEXT2,INSTR(ALARM_TEXT2,'_')+1)UNIT_FLAG
+        ,OCCUR_TIME
+        FROM(
+        SELECT EQP_G,EQP_ID,MODULE FROM PWEB.EQP_ID_USE_STD WHERE  ACTIVE_FLAG = 'Y'
+        <if test="module != null and module != '' and module != 'ALL' "> AND MODULE = #{module,jdbcType=VARCHAR} </if>
+        <if test="eqpG != null and eqpG != '' and eqpG !='ALL' "> AND EQP_G = #{eqpG,jdbcType=VARCHAR} </if>
+        )A
+        JOIN A1MFG.V_PB11_EVENT_ALARM B
+        ON A.EQP_ID =B.EQPID
+        )C)WHERE RN = 1
+        ),KEY_COMMENT_INFO AS(
+            SELECT KEY1 EQP_ID,KEY2 UNIT_ID,KEY3 OCCUR_TIME,F_COMMENT FROM PWEB.COMMENT_SUMMARY WHERE FUNCTION_NAME ='EQP_UNIT_MONITOR'
+        )
+        SELECT EQP_G,EQP_ID,MODULE,ALARM_CODE,UNIT_ID,UNIT_FLAG,OCCUR_TIME,EQP_STATUS,EQP_E10,UNIT_STATUS,UNIT_E10
+        ,UNIT_JUDGE,F_COMMENT
+        FROM(
+        SELECT
+        EQP_G,EQP_ID,MODULE,ALARM_CODE,UNIT_ID,UNIT_FLAG,OCCUR_TIME,EQP_STATUS,EQP_E10,UNIT_STATUS,UNIT_E10
+        ,CASE WHEN UNIT_FLAG = 'OFFLINE' AND NVL(UNIT_STATUS,EQP_STATUS) NOT IN('SDT','UDT','NST') THEN 'Y'
+        ELSE 'N' END UNIT_JUDGE,F_COMMENT
+        FROM(
+        SELECT
+        A.EQP_G,A.EQP_ID,A.MODULE,A.ALARM_CODE,A.UNIT_ID,A.UNIT_FLAG,A.OCCUR_TIME
+        ,B.PREV_STATE  EQP_E10
+        ,B.PREV_E10_STATE_CODE EQP_STATUS
+        ,NVL(C.PREV_STATE,D.PREV_STATE ) UNIT_E10
+        ,NVL(C.PREV_E10_STATE_CODE,D.PREV_E10_STATE_CODE) UNIT_STATUS
+        ,E.F_COMMENT
+        FROM BASE_INFO A
+        LEFT JOIN EQP_STATUS_INFO B
+        ON A.EQP_ID = B.EQP_ID
+        LEFT JOIN EQP_STATUS_INFO C
+        ON A.UNIT_LINK1 = C.EQP_ID
+        LEFT JOIN EQP_STATUS_INFO D
+        ON A.UNIT_LINK2 = D.EQP_ID
+        LEFT JOIN KEY_COMMENT_INFO E
+        ON A.EQP_ID = E.EQP_ID AND A.UNIT_ID = E.UNIT_ID AND TO_CHAR(A.OCCUR_TIME,'YYYY-MM-DD HH24:MI:SS') = E.OCCUR_TIME
+        ))WHERE 1=1
+        <if test="unitJudge != null and unitJudge != '' and unitJudge != 'ALL' ">
+        AND UNIT_JUDGE = #{unitJudge,jdbcType=VARCHAR}
+        </if>
+        <if test="unitFlag != null and unitFlag != '' and unitFlag != 'ALL' ">
+        AND UNIT_FLAG = #{unitFlag,jdbcType=VARCHAR}
+        </if>
+        ORDER BY OCCUR_TIME DESC
+    </select>
+
+
+    <select id="getEQPGroupListByModule" resultType="mfg.reporting.dto.CommonSelectDTO">
+        SELECT 'ALL' value,'ALL' label FROM DUAL
+        UNION ALL
+        SELECT DISTINCT EQP_G value ,EQP_G label FROM(
+        SELECT DISTINCT EQPID FROM  A1MFG.V_PB11_EVENT_ALARM
+        )A JOIN PWEB.EQP_ID_USE_STD B
+        ON A.EQPID = B.EQP_ID
+        WHERE ACTIVE_FLAG = 'Y' AND MODULE = #{module,jdbcType=VARCHAR}
+    </select>
+
+    <select id="getHstEQPUnitMonitorInfo" resultMap="eqpUnitMap">
+SELECT
+        EQP_G,EQP_ID,MODULE,UNIT_ID,UNIT_FLAG,OCCUR_TIME,F_COMMENT
+        FROM(
+        SELECT
+        B.EQP_G,B.MODULE,A.EQPID EQP_ID
+        ,SUBSTR(A.ALARM_TEXT2,1,INSTR(A.ALARM_TEXT2,'_')-1)UNIT_ID
+        ,SUBSTR(A.ALARM_TEXT2,INSTR(A.ALARM_TEXT2,'_')+1)UNIT_FLAG
+        ,A.OCCUR_TIME,C.F_COMMENT
+        FROM A1MFG.V_PB11_EVENT_ALARM A
+        LEFT JOIN PWEB.EQP_ID_USE_STD B
+        ON A.EQPID = B.EQP_ID
+        LEFT JOIN (
+        SELECT KEY1 EQP_ID,KEY2 UNIT_ID,KEY3 OCCUR_TIME,F_COMMENT FROM PWEB.COMMENT_SUMMARY WHERE FUNCTION_NAME ='EQP_UNIT_MONITOR'
+        )C
+        ON A.EQPID = C.EQP_ID AND SUBSTR(A.ALARM_TEXT2,1,INSTR(A.ALARM_TEXT2,'_')-1)=C.UNIT_ID AND TO_CHAR(A.OCCUR_TIME,'YYYY-MM-DD HH24:MI:SS')=C.OCCUR_TIME
+        WHERE 1=1
+        -- 模糊查询
+        <if test="eqpId != null and eqpId != ''">
+            AND A.EQPID LIKE CONCAT(CONCAT('%',#{eqpId,jdbcType=VARCHAR}),'%')
+        </if>
+        <if test="startDate != null and startDate != ''">
+            AND A.OCCUR_TIME &gt;= TO_DATE(#{startDate,jdbcType=VARCHAR},'YYYYMMDD')+7.5/24
+        </if>
+        <if test="endDate != null and endDate != ''">
+            AND A.OCCUR_TIME &lt;= TO_DATE(#{endDate,jdbcType=VARCHAR},'YYYYMMDD')+1+7.5/24
+        </if>
+        )WHERE 1=1
+        --模糊查询
+        <if test="unitId != null and unitId != '' and unitId != 'ALL' ">
+            and UNIT_ID LIKE CONCAT(CONCAT('%',#{unitId,jdbcType=VARCHAR}),'%')
+        </if>
+        <if test="unitFlag != null and unitFlag != '' and unitFlag != 'ALL' ">
+            and UNIT_FLAG = #{unitFlag,jdbcType=VARCHAR}
+        </if>
+        ORDER BY OCCUR_TIME DESC
+    </select>
+
+    <insert id="updateFcomment" >
+        merge into PWEB.COMMENT_SUMMARY A
+        using(
+        SELECT 'EQP_UNIT_MONITOR' FUNCTION_NAME,#{eqpId,jdbcType=VARCHAR} KEY1,#{unitId,jdbcType=VARCHAR} KEY2,#{occurTime,jdbcType=VARCHAR} KEY3, #{fcomment,jdbcType=VARCHAR}F_COMMENT,#{userName,jdbcType=VARCHAR} UPDATE_USER,SYSDATE UPDATE_TIME FROM DUAL
+        )B
+        ON (A.FUNCTION_NAME = B.FUNCTION_NAME AND A.KEY1 = B.KEY1 and A.KEY2 = B.KEY2 AND A.KEY3 = B.KEY3)
+        WHEN MATCHED THEN
+        UPDATE SET A.UPDATE_USER=B.UPDATE_USER,A.UPDATE_TIME=B.UPDATE_TIME,A.F_COMMENT=B.F_COMMENT
+        WHEN NOT MATCHED THEN
+        INSERT (FUNCTION_NAME, KEY1, KEY2,KEY3,F_COMMENT,UPDATE_USER,UPDATE_TIME)VALUES(B.FUNCTION_NAME, B.KEY1, B.KEY2,B.KEY3,B.F_COMMENT,B.UPDATE_USER,B.UPDATE_TIME)
+    </insert>
+</mapper>

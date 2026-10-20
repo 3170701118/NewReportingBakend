@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.DummyMonitorAlarmMapper">
+
+    <insert id="insertDummyMonitorAlarm">
+        insert into A1_MFG.DUMMY_MONITOR_DETAIL(FAB,STD_F,SPECIAL_STOCK,PURPOSE,ACTIVE_FLAG,KEY_COMMENT,UPDATE_USER,UPDATE_TIME)
+        values(#{fab},TO_NUMBER(#{stdf}),#{specialStock,jdbcType=INTEGER},#{purpose},#{activeFlag},#{keyComment},#{updateUser},sysdate)
+    </insert>
+
+    <insert id="insertDummyMonitorAlarmList">
+        INSERT ALL
+        <foreach collection="list" item="item" separator="">
+            into A1_MFG.DUMMY_MONITOR_DETAIL(FAB,STD_F,SPECIAL_STOCK,PURPOSE,ACTIVE_FLAG,KEY_COMMENT,UPDATE_USER,UPDATE_TIME)
+            values(TRIM(#{item.fab}),#{item.stdf},#{item.specialStock,jdbcType=INTEGER},TRIM(#{item.purpose}),0,#{item.keyComment,jdbcType=VARCHAR},#{item.updateUser},sysdate)
+        </foreach>
+        SELECT 1 FROM DUAL
+    </insert>
+
+    <update id="updateDummyMonitorAlarmActiveFlag">
+        update A1_MFG.DUMMY_MONITOR_DETAIL
+        set ACTIVE_FLAG = #{activeFlag},STD_F = #{stdf},UPDATE_TIME = sysdate,UPDATE_USER = #{updateUser}
+        ,KEY_COMMENT = #{keyComment}
+        where FAB = #{fab}
+        and PURPOSE = #{purpose}
+    </update>
+
+    <delete id="deleteDummyMonitorAlarm">
+        delete from A1_MFG.DUMMY_MONITOR_DETAIL
+        where FAB = #{fab}
+        and PURPOSE = #{purpose}
+    </delete>
+
+    <select id="getDummyMonitorAlarm" resultType="java.util.Map">
+        select FAB,MODULE,STD_F,PURPOSE,ACTIVE_FLAG,STD_STOCK,MFG_QTY
+        ,AREA,BANK_ID,USE_EQP,F_COMMENT,KEY_COMMENT
+        ,ALARM_FLAG,UPDATE_USER,UPDATE_TIME
+        ,SPECIAL_STOCK
+        ,ROUND(MFG_QTY - (STD_STOCK *STD_F)) AS STOCK_DIFF
+        ,ROUND(MFG_QTY - SPECIAL_STOCK) AS SPECIAL_STOCK_DIFF
+        from A1_MFG.DUMMY_MONITOR_DETAIL
+        where FAB = #{fab}
+        <if test="module != null and module !='' and module !='TOTAL'">
+            and MODULE = #{module}
+        </if>
+        <if test="purpose != null and purpose !=''">
+            and PURPOSE like'%'||#{purpose}||'%'
+        </if>
+    </select>
+
+    <select id="getDummyMonitorAlarmList" resultType="map" parameterType="list">
+        select A.*
+        from A1_MFG.DUMMY_MONITOR_DETAIL A
+        JOIN (
+        <foreach collection="list" item="item" separator=" UNION ALL " >
+            SELECT #{item.fab} FAB,#{item.purpose} PURPOSE FROM DUAL
+        </foreach>
+        )B
+        ON A.FAB = B.FAB AND A.PURPOSE = B.PURPOSE
+    </select>
+
+    <select id="getDummyMailAlarmList" resultType="map">
+        select
+        FAB,MODULE,STD_F,PURPOSE,STD_STOCK,MFG_QTY,AREA,BANK_ID,USE_EQP,F_COMMENT,ALARM_FLAG
+        ,'Dummy水位不足，请尽快领料' || DECODE(KEY_COMMENT,'','','-') || KEY_COMMENT AS KEY_COMMENT
+        from A1_MFG.DUMMY_MONITOR_DETAIL
+        WHERE ALARM_FLAG = 'Y'
+    </select>
+</mapper>

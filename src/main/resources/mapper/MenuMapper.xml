@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.MenuMapper">
+
+    <select id="getMenuInfoList" resultType="mfg.reporting.pojo.MenuInfo">
+        SELECT A.MENU_ID,A.PARENT_MENU_ID,A.ROUTE_NAME,A.MENU_NAME,A.MENU_TYPE,A."PATH",A."RANK",A.REMARK,A.HIDE,A.STATUS,A.ADMIN_FLAG
+        ,CASE WHEN A.PARENT_MENU_ID = '-1' THEN '根目录' ELSE B.MENU_NAME END PARENT_MENU_NAME
+        FROM A1MFG.SYS_MENU_LIST A
+        LEFT JOIN A1MFG.SYS_MENU_LIST B
+        ON A.PARENT_MENU_ID = B.MENU_ID
+    </select>
+
+    <select id="getMenuInfoDetails" resultType="mfg.reporting.pojo.MenuInfo">
+        SELECT
+        A.*,
+        CASE WHEN A.PARENT_MENU_ID = '-1' THEN '根目录' ELSE B.MENU_NAME END PARENT_MENU_NAME
+        FROM(
+        SELECT MENU_ID,PARENT_MENU_ID,ROUTE_NAME,MENU_NAME,MENU_TYPE,"PATH","RANK",REMARK,HIDE,STATUS,ADMIN_FLAG
+        FROM A1MFG.SYS_MENU_LIST WHERE MENU_ID = #{menuId}
+        ) A LEFT JOIN A1MFG.SYS_MENU_LIST B
+        ON A.PARENT_MENU_ID = B.MENU_ID
+    </select>
+
+    <select id="getMenuInfoListByParam" resultType="mfg.reporting.pojo.MenuInfo" parameterType="mfg.reporting.pojo.MenuInfo">
+        SELECT MENU_ID,PARENT_MENU_ID,ROUTE_NAME,MENU_NAME,MENU_TYPE,"PATH","RANK",REMARK,HIDE,STATUS,ADMIN_FLAG
+        FROM A1MFG.SYS_MENU_LIST WHERE 1=1 AND ( 1 != 1
+        <if test="menuId!= null and menuId!= ''">
+            OR MENU_ID = #{menuId}
+        </if>
+        <if test="path!= null and path!= ''">
+            OR PATH = #{path}
+        </if>
+        <if test="menuName!= null and menuName!= ''">
+            OR MENU_NAME = #{menuName}
+        </if>
+        ) AND PARENT_MENU_ID = #{parentMenuId}
+    </select>
+
+    <insert id="insertMenuInfo" parameterType="mfg.reporting.pojo.MenuInfo">
+        INSERT INTO A1MFG.SYS_MENU_LIST(MENU_ID,PARENT_MENU_ID,ROUTE_NAME,MENU_NAME,MENU_TYPE,"PATH","RANK",REMARK,HIDE,STATUS,ADMIN_FLAG,CREATE_TIME,CREATE_USER,UPDATE_TIME,UPDATE_USER)
+    VALUES(#{menuId},#{parentMenuId},#{routeName},#{menuName},#{menuType},#{path},#{rank},#{remark,jdbcType=VARCHAR},#{hide},#{status},#{adminFlag},sysdate,#{createUser},sysdate,#{createUser})
+    </insert>
+
+    <update id="updateMenuInfo" parameterType="mfg.reporting.pojo.MenuInfo">
+        UPDATE A1MFG.SYS_MENU_LIST
+        SET UPDATE_USER = #{updateUser},UPDATE_TIME = SYSDATE
+        <if test="routeName!= null and routeName!= ''">
+            ,ROUTE_NAME = #{routeName}
+        </if>
+        <if test="menuName!= null and menuName!= ''">
+            ,MENU_NAME = #{menuName}
+        </if>
+        <if test="menuType!= null and menuType!= ''">
+            ,MENU_TYPE = #{menuType}
+        </if>
+        <if test="path!= null and path!= ''">
+            ,PATH = #{path}
+        </if>
+        <if test="rank!= null and rank!= ''">
+            ,RANK = #{rank}
+        </if>
+        <if test="remark!= null and remark!= ''">
+            ,REMARK = #{remark}
+        </if>
+        <if test="hide!= null and hide!= ''">
+            ,HIDE = #{hide}
+        </if>
+        <if test="status!= null and status!= ''">
+            ,STATUS = #{status}
+        </if>
+        <if test="adminFlag!= null and adminFlag!= ''">
+            ,ADMIN_FLAG = #{adminFlag}
+        </if>
+        WHERE MENU_ID = #{menuId}
+    </update>
+
+    <delete id="deleteMenuInfo">
+        DELETE FROM A1MFG.SYS_MENU_LIST WHERE MENU_ID = #{menuId}
+    </delete>
+</mapper>

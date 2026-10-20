@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.DownSamplingMapper">
+
+    <select id="getMainTainEqpGroup" resultType="map">
+        SELECT KEY1 EQP_G FROM PWEB.COMMENT_SUMMARY WHERE FUNCTION_NAME = 'QAX_DownSampling'
+    </select>
+
+    <resultMap id="DownSamplingPEJurgeMap" type="mfg.reporting.pojo.DownSamplingPEJurgePO">
+        <result property="tech" column="TECH"/>
+        <result property="prodg1" column="PRODG1"/>
+        <result property="prodspecId" column="PRODSPEC_ID"/>
+        <result property="flowId" column="FLOW_ID"/>
+        <result property="opeNo" column="OPE_NO"/>
+        <result property="move" column="MOVE"/>
+        <result property="eqpG" column="EQP_G"/>
+        <result property="claimTimeMax" column="CLAIM_TIME_MAX"/>
+        <result property="claimTimeMin" column="CLAIM_TIME_MIN"/>
+        <result property="sr" column="SR"/>
+        <result property="module" column="MODULE"/>
+        <result property="lastMainOpe" column="LAST_MAIN_OPE"/>
+        <result property="stdSr" column="STD_SR"/>
+        <result property="uploadTime" column="UPLOAD_TIME"/>
+        <result property="jurgeResult" column="JURGE_RESULT"/>
+        <result property="wip" column="WIP"/>
+        <result property="srResult" column="SR_RESULT"/>
+        <result property="updateUser" column="UPDATE_USER"/>
+    </resultMap>
+
+
+    <select id="getPEJurgeList" resultMap="DownSamplingPEJurgeMap">
+        SELECT
+        F.*,G.JURGE_RESULT,NVL(H.WIP,0) WIP
+        FROM(
+        SELECT TECH,PRODG1,PRODSPEC_ID,FLOW_ID,OPE_NO,MOVE,EQP_G,CLAIM_TIME_MAX,CLAIM_TIME_MIN,SR,MODULE,LAST_MAIN_OPE,STD_SR,UPLOAD_TIME FROM(
+        SELECT D.*,NVL(E.STD_SR,1)STD_SR,E.UPDATE_TIME UPLOAD_TIME FROM(
+        SELECT TECH, PRODG1,PRODSPEC_ID,OPE_NO,MOVE,EQP_G,CLAIM_TIME_MAX,CLAIM_TIME_MIN
+        ,SR,MODULE,LAST_MAIN_OPE,FLOW_ID FROM(
+        SELECT
+        C.MFG_TECH TECH,A.PRODG1,A.PRODSPEC_ID,A.OPE_NO,A.MOVE,A.EQP_G,A.CLAIM_TIME_MAX,A.CLAIM_TIME_MIN,A.SR,A.MODULE,A.LAST_MAIN_OPE
+        ,B.KEY2 MOVE_TARGET,D.FLOW_ID
+        FROM A1MFG.DOWNSAMPLING_MOVE_HISTORY A
+        LEFT JOIN PWEB.COMMENT_SUMMARY B
+        ON B.FUNCTION_NAME = 'QAX_DownSampling' AND A.EQP_G = B.KEY1
+        LEFT JOIN A1MFG.PRODUCT_TECH_INFO C
+        ON A.PRODG1 = C.PRODG1
+        LEFT JOIN ODS.WP_PRODUCT D
+        ON A.PRODSPEC_ID = D.PRODSPEC_ID
+        )WHERE MOVE &gt;= MOVE_TARGET AND EQP_G = #{eqpG ,javaType=String,jdbcType=VARCHAR}
+        )D
+        LEFT JOIN A1MFG.DOWNSAMPLING_TARGET_SR E
+        ON D.TECH = E.TECH AND D.OPE_NO = E.OPE_NO
+        )WHERE SR &gt; STD_SR
+        )F LEFT JOIN A1MFG.DOWNSAMPLING_JURGE_HISTORY G
+        ON F.PRODG1 =G.PRODG1 AND F.OPE_NO = G.OPE_NO AND F.UPLOAD_TIME = G.UPLOAD_STD_TIME
+        LEFT JOIN(
+        SELECT LINE, PRODG1,SUM(WAFER_QTY)WIP FROM(
+        SELECT PRODG1,WAFER_QTY,LINE FROM  PWEB.LOT_HOUR_TM AA
+        WHERE UPPER(AA.LOT_INV_STATE) IN ('INBACKUPBANK', 'ONMOVEOUT', 'ONFLOOR')
+        AND AA.LOT_FINISHED_STATE IS NULL
+        AND AA.NENG_FLAG = '1'
+        AND AA.PW_FLAG = '1'
+        UNION ALL
+        SELECT PRODG1,WAFER_QTY,LINE FROM PWEB.LOT_HOUR_TM@TO_A3PDW AA
+        WHERE UPPER(AA.LOT_INV_STATE) IN ('INBACKUPBANK', 'ONMOVEOUT', 'ONFLOOR')
+        AND AA.LOT_FINISHED_STATE IS NULL
+        AND AA.NENG_FLAG = '1'
+        AND AA.PW_FLAG = '1'
+        )GROUP BY LINE, PRODG1
+        )H
+        ON F.PRODG1 = H.PRODG1
+        WHERE G.JURGE_RESULT IS NULL
+        ORDER BY NVL(H.WIP,0) DESC
+    </select>
+
+    <insert id="insertPEJurgeRecord" parameterType="mfg.reporting.pojo.DownSamplingPEJurgePO">
+        INSERT INTO A1MFG.DOWNSAMPLING_JURGE_HISTORY
+        (PRODG1,PRODSPEC_ID,OPE_NO,EQP_G,MODULE,CUR_SR,STD_SR,UPLOAD_STD_TIME,JURGE_RESULT,UPDATE_TIME,UPDATE_USER)
+        VALUES
+        (#{prodg1},#{prodspecId,jdbcType=VARCHAR},#{opeNo},#{eqpG,jdbcType=VARCHAR},#{module,jdbcType=VARCHAR},#{sr,jdbcType=DOUBLE}
+        ,#{stdSr,jdbcType=DOUBLE},TO_DATE(#{uploadTime,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),#{jurgeResult,jdbcType=VARCHAR},SYSDATE,#{updateUser,jdbcType=VARCHAR})
+    </insert>
+
+    <select id="getPEJurgeRecordHs" resultMap="DownSamplingPEJurgeMap">
+        SELECT C.*,D.SR
+        ,CASE WHEN C.JURGE_RESULT='N' THEN ''
+        WHEN D.SR&lt;= C.STD_SR THEN 'Done' ELSE 'OnGoing' END SR_RESULT
+        ,NVL(E.WIP,0) WIP
+        FROM(
+        SELECT A.PRODG1,B.CHIP_BODY ,A.PRODSPEC_ID,B.FLOW_ID ,A.OPE_NO,A.EQP_G,A.STD_SR,A.JURGE_RESULT,A.UPDATE_TIME,A.UPDATE_USER FROM(
+        SELECT B.MFG_TECH TECH,A.* FROM(
+        SELECT PRODG1,PRODSPEC_ID,OPE_NO,EQP_G,MODULE,CUR_SR,STD_SR,UPLOAD_STD_TIME,JURGE_RESULT,UPDATE_TIME,UPDATE_USER
+        FROM A1MFG.DOWNSAMPLING_JURGE_HISTORY WHERE EQP_G = #{eqpG,jdbcType=VARCHAR}
+        )A LEFT JOIN A1MFG.PRODUCT_TECH_INFO B
+        ON A.PRODG1 = B.PRODG1
+        LEFT JOIN A1MFG.DOWNSAMPLING_TARGET_SR C
+        ON B.MFG_TECH = C.TECH AND A.OPE_NO = C.OPE_NO AND A.UPLOAD_STD_TIME = C.UPDATE_TIME)A LEFT JOIN ODS.WP_PRODUCT B
+        ON A.PRODSPEC_ID = B.PRODSPEC_ID
+        )C LEFT JOIN(
+        SELECT PRODG1,OPE_NO,MAX(SAMPLING_RATE)SR FROM(
+        SELECT PRODG1,PRODSPEC_ID,OPE_NO,SAMPLING_RATE
+        FROM PWEB.SAMPLING_RATE
+        )GROUP BY PRODG1,OPE_NO
+        )D
+        ON C.PRODG1 = D.PRODG1 AND C.OPE_NO = D.OPE_NO
+        LEFT JOIN(
+        SELECT LINE, PRODG1,SUM(WAFER_QTY)WIP FROM(
+        SELECT PRODG1,WAFER_QTY,LINE FROM  PWEB.LOT_HOUR_TM AA
+        WHERE UPPER(AA.LOT_INV_STATE) IN ('INBACKUPBANK', 'ONMOVEOUT', 'ONFLOOR')
+        AND AA.LOT_FINISHED_STATE IS NULL
+        AND AA.NENG_FLAG = '1'
+        AND AA.PW_FLAG = '1'
+        UNION ALL
+        SELECT PRODG1,WAFER_QTY,LINE FROM PWEB.LOT_HOUR_TM@TO_A3PDW AA
+        WHERE UPPER(AA.LOT_INV_STATE) IN ('INBACKUPBANK', 'ONMOVEOUT', 'ONFLOOR')
+        AND AA.LOT_FINISHED_STATE IS NULL
+        AND AA.NENG_FLAG = '1'
+        AND AA.PW_FLAG = '1'
+        )GROUP BY LINE, PRODG1
+        )E
+        ON C.PRODG1 = E.PRODG1
+        ORDER BY NVL(E.WIP,0) DESC
+    </select>
+
+
+    <select id="getDownSamplingTargetSrList" resultType="map">
+        SELECT TECH , OPE_NO,STD_SR,UPDATE_USER,UPDATE_TIME FROM A1MFG.DOWNSAMPLING_TARGET_SR
+        WHERE 1=1
+        <if test="tech != null and tech != ''">
+            AND TECH = #{tech,jdbcType=VARCHAR}
+        </if>
+        <if test="opeNo != null and opeNo != ''">
+            AND OPE_NO LIKE '%'|| #{opeNo,jdbcType=VARCHAR}||'%'
+        </if>
+    </select>
+
+    <insert id="insertPEJurgeRecordList">
+        INSERT INTO A1MFG.DOWNSAMPLING_JURGE_HISTORY(PRODG1,PRODSPEC_ID,OPE_NO,EQP_G,MODULE,CUR_SR,STD_SR,UPLOAD_STD_TIME,JURGE_RESULT,UPDATE_TIME,UPDATE_USER)
+        SELECT A.PRODG1,A.PRODSPEC_ID,A.OPE_NO,B.EQP_G,A.MODULE,A.SR CUR_SR,A.STD_SR,D.UPDATE_TIME UPLOAD_STD_TIME,A.JURGE_RESULT,A.UPDATE_TIME,A.UPDATE_USER FROM(
+        <foreach collection="list" item="item" index="index" separator=" UNION ALL ">
+            SELECT #{item.prodg1,jdbcType=VARCHAR} PRODG1,#{item.prodspecId,jdbcType=VARCHAR} PRODSPEC_ID,#{item.opeNo,jdbcType=VARCHAR} OPE_NO
+            ,#{item.module,jdbcType=VARCHAR} MODULE,#{item.sr,jdbcType=DOUBLE} SR
+            ,#{item.stdSr,jdbcType=DOUBLE} STD_SR,#{item.jurgeResult,jdbcType=VARCHAR} JURGE_RESULT,SYSDATE UPDATE_TIME,#{item.updateUser,jdbcType=VARCHAR} UPDATE_USER
+            FROM DUAL
+        </foreach>
+        )A LEFT JOIN A1MFG.DOWNSAMPLING_MOVE_HISTORY B
+        ON A.PRODG1 = B.PRODG1 AND A.OPE_NO = B.OPE_NO
+        LEFT JOIN A1MFG.PRODUCT_TECH_INFO C
+        ON A.PRODG1 = C.PRODG1
+        LEFT JOIN A1MFG.DOWNSAMPLING_TARGET_SR D
+        ON C.MFG_TECH = D.TECH AND A.OPE_NO = D.OPE_NO
+
+
+    </insert>
+
+    <insert id="insertStdSRTargetList">
+        MERGE INTO A1MFG.DOWNSAMPLING_TARGET_SR A
+        USING (
+        SELECT A.TECH,B.OPE_NO
+        ,CASE WHEN B.STD_SR = 0 THEN 0 ELSE 1/B.STD_SR END STD_SR,B.UPDATE_USER,SYSDATE UPDATE_TIME FROM(
+            SELECT DISTINCT MFG_TECH TECH FROM A1MFG.PRODUCT_TECH_INFO
+        )A
+        JOIN(
+        <foreach collection="list" item="item" index="index" separator=" UNION ALL ">
+            SELECT TRIM(#{item.tech,jdbcType=VARCHAR}) TECH, TRIM(#{item.opeNo,jdbcType=VARCHAR}) OPE_NO, #{item.stdSR,jdbcType=DOUBLE} STD_SR, #{item.updateUser,jdbcType=VARCHAR} UPDATE_USER FROM DUAL
+        </foreach>
+        )B
+        ON A.TECH = B.TECH
+        ) B
+        ON (A.TECH = B.TECH AND A.OPE_NO = B.OPE_NO)
+        WHEN MATCHED THEN
+            UPDATE SET A.STD_SR = B.STD_SR, A.UPDATE_USER = B.UPDATE_USER, A.UPDATE_TIME = SYSDATE
+        WHEN NOT MATCHED THEN
+            INSERT (TECH, OPE_NO, STD_SR, UPDATE_USER, UPDATE_TIME)
+            VALUES (B.TECH, B.OPE_NO, B.STD_SR, B.UPDATE_USER, SYSDATE)
+    </insert>
+
+
+    <select id="getDownSamplingMoveDetails" resultType="map">
+        SELECT A.PRODG1,B.* FROM(
+        SELECT PRODG1, PRODSPEC_ID FROM ODS.WP_PRODUCT WHERE PRODG1 = #{prodg1,jdbcType=VARCHAR}
+        )A
+        JOIN(
+        SELECT
+        LOT_ID,OPE_NO,PRODSPEC_ID,MAINPD_ID,EQP_ID,NENG_FLAG,'N1A1'LOCATION,WAFER_QTY,CAST_ID,PROCESS_START_TIME,CLAIM_TIME
+        FROM ODS.MOVE_HISTORY WHERE CLAIM_TIME BETWEEN  TO_DATE(#{claimTimeMin},'YYYY-MM-DD HH24:MI:SS')  AND TO_DATE(#{claimTimeMax},'YYYY-MM-DD HH24:MI:SS')
+        AND OPE_NO = #{opeNo} AND MOVE_FLAG =1 AND OPE_CATEGORY  ='OperationComplete' AND NENG_FLAG =1
+        AND SUBSTR(MAINPD_ID,1,3) &lt;&gt;'DYB' AND SUBSTR(MAINPD_ID,1,2)&lt;&gt;'YY' AND SUBSTR(MAINPD_ID,1,2)&lt;&gt;'YX' AND SUBSTR(MAINPD_ID,1,1)&lt;&gt;'B'
+        UNION ALL
+        SELECT
+        LOT_ID,OPE_NO,PRODSPEC_ID,MAINPD_ID,EQP_ID,NENG_FLAG,'N1A1'LOCATION,WAFER_QTY,CAST_ID,PROCESS_START_TIME,CLAIM_TIME
+        FROM PWEB.MOVE_HISTORY_A3 WHERE CLAIM_TIME BETWEEN  TO_DATE(#{claimTimeMin},'YYYY-MM-DD HH24:MI:SS')  AND TO_DATE(#{claimTimeMax},'YYYY-MM-DD HH24:MI:SS')
+        AND OPE_NO = #{opeNo} AND MOVE_FLAG =1 AND OPE_CATEGORY  ='OperationComplete' AND NENG_FLAG =1
+        AND SUBSTR(MAINPD_ID,1,3) &lt;&gt;'DYB' AND SUBSTR(MAINPD_ID,1,2)&lt;&gt;'YY' AND SUBSTR(MAINPD_ID,1,2)&lt;&gt;'YX' AND SUBSTR(MAINPD_ID,1,1)&lt;&gt;'B'
+        )B
+        ON A.PRODSPEC_ID = B.PRODSPEC_ID
+    </select>
+</mapper>

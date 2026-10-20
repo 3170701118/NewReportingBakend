@@ -1,0 +1,540 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.OcsMonitorMapper">
+
+    <select id="getOcsMonitorTableSummary" resultType="map">
+        WITH MODULE_LIST AS(
+        SELECT 'PHOTO' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'ETCH' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'TF' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'DIFF' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'WET' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'CMP' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'METRO' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'Total' MODULE FROM DUAL
+        ),
+        OCS_MONITOR_INFO AS(
+        SELECT
+        NVL(MODULE,'Total')MODULE
+        ,SUM(CASE WHEN PLAN_FLAG = 1 THEN 1 ELSE 0 END )PLAN_COUNT
+        ,SUM(CASE WHEN JOB_FLAG = 1 THEN 1 ELSE 0 END )JOB_COUNT
+        ,SUM(ABNORMAL_FLAG)ABNORMAL_COUNT
+        ,SUM(CREATE_FLAG)CREATE_COUNT
+        ,SUM(COMPLETE_FLAG)COMPLETE_COUNT
+        ,SUM(OK_FLAG)OK_COUNT
+        ,SUM(NCT_FLAG)NCT_COUNT
+        FROM(
+        SELECT
+        MODULE,TOOLID,JOB_SPEC_GROUP_ID,MONTIOR_PLAN_NAME
+        ,ROW_NUMBER()OVER(PARTITION BY MODULE,MONTIOR_PLAN_NAME ORDER BY REGTIME)PLAN_FLAG
+        ,1 JOB_FLAG
+        ,COUNT(1)OVER(PARTITION BY MODULE,MONTIOR_PLAN_NAME,TOOLID,JOB_SPEC_GROUP_ID)-1 ABNORMAL_FLAG
+        ,CASE WHEN CREATE_JOB_PO_ID IS NOT NULL THEN 1 ELSE 0 END CREATE_FLAG
+        ,CASE WHEN JOBGROUP_STATUS IN('Confirm','Complete') THEN 1 ELSE 0 END COMPLETE_FLAG
+        ,CASE WHEN DC_SPEC_STATUS ='OK'THEN 1 ELSE 0 END OK_FLAG
+        ,CASE WHEN CREATE_JOB_PO_ID IS NULL THEN 1 ELSE 0 END NCT_FLAG
+        FROM A1_MFG.OCS_MONITOR_PLAN_SETTING_DAILY
+        WHERE
+        SHIFT_DATE = #{shiftDate,jdbcType=VARCHAR}
+        <if test="daynight != '' and daynight != null and daynight != 'TOTAL' ">
+            AND DAYNIGHT= #{daynight,jdbcType=VARCHAR}
+        </if>
+        <if test="fab=='N1A1'">
+            AND LENGTH(TOOLID)=5
+        </if>
+        <if test="fab=='N1A3'">
+            AND LENGTH(TOOLID)=6
+        </if>
+        )GROUP BY ROLLUP(MODULE)
+        ),OCS_JOB_STATUS_INFO AS(
+        SELECT NVL(MODULE,'Total')MODULE
+        ,SUM(HOLD_COUNT)HOLD_COUNT
+        ,SUM(SBY_COUNT)SBY_COUNT
+        ,SUM(PRD_COUNT)PRD_COUNT
+        ,SUM(ABORT_COUNT)ABORT_COUNT
+        FROM(
+        SELECT MODULE,STATUS
+        ,CASE WHEN STATUS = 'Hold' THEN  STATUS_COUNT END HOLD_COUNT
+        ,CASE WHEN STATUS = 'SBY' THEN  STATUS_COUNT END SBY_COUNT
+        ,CASE WHEN STATUS = 'PRD' THEN  STATUS_COUNT END PRD_COUNT
+        ,CASE WHEN STATUS = 'Abort' THEN  STATUS_COUNT END ABORT_COUNT
+        FROM(
+        SELECT     MODULE,STATUS,DATE_TYPE,STATUS_COUNT FROM(
+        SELECT
+        MODULE,STATUS,DATE_TYPE,STATUS_COUNT,ROW_NUMBER()OVER(PARTITION BY MODULE,STATUS ORDER BY DECODE(DATE_TYPE,'day',1,2) DESC ) RN
+        FROM(
+        SELECT MODULE,STATUS,DATE_TYPE,COUNT(1)STATUS_COUNT
+        FROM A1_MFG.OCS_MONITOR_JOB_STATUS
+        WHERE
+        SHIFT_DATE = #{shiftDate,jdbcType=VARCHAR}
+        <if test="fab=='N1A1'">
+            AND LENGTH(PTOOL_ID)=5
+        </if>
+        <if test="fab=='N1A3'">
+            AND LENGTH(PTOOL_ID)=6
+        </if>
+        <if test="daynight != '' and daynight != null and daynight != 'TOTAL'">
+            AND DATE_TYPE = #{daynight,jdbcType=VARCHAR}
+        </if>
+        GROUP BY MODULE,STATUS,DATE_TYPE
+        ) )WHERE RN=1
+        )
+        )GROUP BY ROLLUP(MODULE)
+        ),OCS_MONITOR_RATIO_INFO AS(
+        SELECT
+        MODULE,MAX(BEFORE_NG_RATIO)BEFORE_NG_RATIO
+        ,MAX(AFTER_NG_RATIO)AFTER_NG_RATIO
+        ,MAX(NONE_NG_RATIO)NONE_NG_RATIO
+        FROM(
+        SELECT
+        MODULE
+        ,CASE WHEN TEST_FOR = 'Before' AND TOTAL_COUNT &gt;0  THEN ROUND(NG_COUNT*100/TOTAL_COUNT,1) END BEFORE_NG_RATIO
+        ,CASE WHEN TEST_FOR = 'After' AND TOTAL_COUNT &gt;0  THEN ROUND(NG_COUNT*100/TOTAL_COUNT,1) END AFTER_NG_RATIO
+        ,CASE WHEN TEST_FOR = 'None' AND TOTAL_COUNT &gt;0  THEN ROUND(NG_COUNT*100/TOTAL_COUNT,1) END NONE_NG_RATIO
+        FROM(
+        SELECT
+        NVL(MODULE,'Total')MODULE,TEST_FOR,SUM(TOTAL_COUNT)TOTAL_COUNT,SUM(NG_COUNT)NG_COUNT
+        FROM A1_MFG.OCS_MOVE_NG_SUMMARY
+        WHERE SHIFT_DATE = #{shiftDate,jdbcType=VARCHAR}
+        <if test="fab=='N1A1'">
+            AND LENGTH(PTOOL_ID)=5
+        </if>
+        <if test="fab=='N1A3'">
+            AND LENGTH(PTOOL_ID)=6
+        </if>
+        GROUP BY ROLLUP(MODULE),TEST_FOR
+        ))GROUP BY MODULE
+        ),AUTO_RATIO_INFO AS(
+        SELECT
+        NVL(MODULE,'Total')MODULE,COUNT(1)TOTAL_JOB_PO_COUNT,SUM(AUTO_FLAG)AUTO_COUNT
+        ,CASE WHEN COUNT(1) &gt; 0 THEN ROUND(SUM(AUTO_FLAG)*100/COUNT(1) ,1) END AUTO_RATIO
+        FROM(
+        SELECT
+        DISTINCT MODULE,JOB_SPEC_GROUP_PO_ID
+        ,CASE WHEN SUBSTR(JOB_SPEC_GROUP_PO_ID,-1,1) IN('P','C') THEN 0 ELSE 1 END AUTO_FLAG
+        FROM A1_MFG.OCS_MONITOR_MOVE_DETAIL_HS
+        WHERE TO_CHAR(CREATE_TIME-8/24,'YYYYMMDD') = #{shiftDate,jdbcType=VARCHAR}
+        <if test="daynight != '' and daynight != null and daynight != 'TOTAL'">
+            AND (CASE WHEN TO_NUMBER(TO_CHAR(CREATE_TIME-8/24,'HH24'))&lt;=12 THEN 'day' ELSE 'night' END) = #{daynight,jdbcType=VARCHAR}
+        </if>
+        <if test="fab=='N1A1'">
+            AND LENGTH(PTOOL_ID)=5
+        </if>
+        <if test="fab=='N1A3'">
+            AND LENGTH(PTOOL_ID)=6
+        </if>
+        )GROUP BY ROLLUP(MODULE)
+        )
+        SELECT
+        A.MODULE,B.PLAN_COUNT,B.JOB_COUNT,B.ABNORMAL_COUNT,B.CREATE_COUNT
+        ,CASE WHEN  NVL(JOB_COUNT,0)>0
+        THEN NVL(B.COMPLETE_COUNT,0) || '(' || TO_CHAR(B.COMPLETE_COUNT*100/B.JOB_COUNT,'FM990.0') ||'%)' END COMPLETE_COUNT
+        ,B.OK_COUNT|| '(' || TO_CHAR(B.OK_COUNT/B.JOB_COUNT,'FM990.0') ||'%)' OK_COUNT
+        ,B.NCT_COUNT
+        ,C.HOLD_COUNT,C.SBY_COUNT,C.PRD_COUNT,C.ABORT_COUNT,E.AUTO_RATIO,D.BEFORE_NG_RATIO,D.AFTER_NG_RATIO
+        ,D.NONE_NG_RATIO
+        FROM MODULE_LIST A
+        LEFT JOIN OCS_MONITOR_INFO B
+        ON A.MODULE = B.MODULE
+        LEFT JOIN OCS_JOB_STATUS_INFO C
+        ON A.MODULE = C.MODULE
+        LEFT JOIN OCS_MONITOR_RATIO_INFO D
+        ON A.MODULE = D.MODULE
+        LEFT JOIN AUTO_RATIO_INFO E
+        ON A.MODULE = E.MODULE
+        ORDER BY DECODE(A.MODULE,'PHOTO',1,'ETCH',2,'TF',3,'DIFF',4,'WET',5,'CMP',6,'METRO',7)
+    </select>
+
+    <select id="getOcsMonitorPlanDetails" resultType="map">
+        SELECT
+        MONTIOR_PLAN_NAME,MODULE,DAYNIGHT,REGTIME,LASTSTARTTIME,JOB_CREATE_STATUS
+        ,RECYCLETYPE,RECYCLEVALUE,STARTTIME,EXTRA_HR,TOOLID,SUBNAME,PURPOSE,TEST_FOR,JOB_SPEC_GROUP_ID
+        FROM(
+        SELECT
+        MONTIOR_PLAN_NAME,MODULE,DAYNIGHT,REGTIME,LASTSTARTTIME
+        ,RECYCLETYPE,RECYCLEVALUE,STARTTIME,EXTRA_HR,TOOLID,SUBNAME,PURPOSE,TEST_FOR,JOB_SPEC_GROUP_ID
+        ,CASE WHEN DC_SPEC_STATUS ='OK' THEN 'OK'
+        WHEN JOBGROUP_STATUS = 'Confirm' OR JOBGROUP_STATUS = 'Complete' THEN 'Complete'
+        WHEN CREATE_JOB_PO_ID IS NOT NULL THEN 'Create' ELSE 'Null' END JOB_CREATE_STATUS
+        ,COUNT(1)OVER(PARTITION BY MODULE,MONTIOR_PLAN_NAME,TOOLID,JOB_SPEC_GROUP_ID)-1 ABNORMAL_FLAG
+        FROM A1_MFG.OCS_MONITOR_PLAN_SETTING_DAILY
+        WHERE
+        SHIFT_DATE = #{shiftDate,jdbcType=VARCHAR}
+        <if test="daynight != '' and daynight != null and daynight != 'TOTAL'">
+        AND DAYNIGHT= #{daynight,jdbcType=VARCHAR}
+        </if>
+        <if test="module !='Total'">
+            AND MODULE = #{module,jdbcType=VARCHAR}
+        </if>
+        <if test="fab=='N1A1'">
+            AND LENGTH(TOOLID)=5
+        </if>
+        <if test="fab=='N1A3'">
+            AND LENGTH(TOOLID)=6
+        </if>
+        )
+        WHERE 1=1
+        <if test="'ABNORMAL_COUNT'.equals(type)">
+            AND ABNORMAL_FLAG &gt; 0
+        </if>
+        <if test="'CREATE_COUNT'.equals(type)">
+            AND JOB_CREATE_STATUS IN('Complete','OK' ,'Create')
+        </if>
+        <if test="'COMPLETE_COUNT'.equals(type)">
+            AND JOB_CREATE_STATUS IN('Complete','OK')
+        </if>
+        <if test="'OK_COUNT'.equals(type)">
+            AND JOB_CREATE_STATUS = 'OK'
+        </if>
+        <if test="'NCT_COUNT'.equals(type)">
+            AND JOB_CREATE_STATUS = 'Null'
+        </if>
+        ORDER BY MONTIOR_PLAN_NAME,TOOLID,JOB_SPEC_GROUP_ID
+    </select>
+
+
+    <select id="getOcsMonitorStatusDetails" resultType="map">
+
+        SELECT
+        PTOOL_ID,JOB_SPEC_GROUP_ID,MODULE,FOUP_ID,JOB_SPEC_GROUP_PO_ID,LOTID,STATUS
+        ,TEST_FOR,SUB_NAME,SUBSYSTEM,CREATOR,CREATE_TIME,ROUND((UPDATE_TIME -  CREATE_TIME)*24,1) DUR
+        ,CASE WHEN UPDATE_TIME - LAST_OP_COMP_TIME &lt;30 THEN ROUND((UPDATE_TIME -  NVL(LAST_OP_COMP_TIME,CREATE_TIME))*24,1)  END STAY_TIME
+        FROM A1_MFG.OCS_MONITOR_JOB_STATUS
+        WHERE SHIFT_DATE = #{shiftDate,jdbcType=VARCHAR}
+        <if test="daynight != '' and daynight != null and daynight = 'TOTAL'">
+        AND (
+        (  SHIFT_DATE &lt; TO_CHAR(SYSDATE-8/24,'YYYYMMDD') AND DATE_TYPE='night')
+        OR (  SHIFT_DATE = TO_CHAR(SYSDATE-8/24,'YYYYMMDD')
+        AND
+        DATE_TYPE= (CASE WHEN TO_NUMBER(TO_CHAR(SYSDATE-8/24,'HH24'))&lt;=12 THEN 'day' ELSE 'night' END)
+        )
+        )
+        </if>
+        <if test="daynight != '' and daynight != null and daynight != 'TOTAL'">
+            AND DATE_TYPE= #{daynight,jdbcType=VARCHAR}
+        </if>
+        <if test="module !='Total'">
+            AND MODULE = #{module,jdbcType=VARCHAR}
+        </if>
+
+        <if test="fab=='N1A1'">
+            AND LENGTH(PTOOL_ID)=5
+        </if>
+        <if test="fab=='N1A3'">
+            AND LENGTH(PTOOL_ID)=6
+        </if>
+        <if test="type == 'PRD_COUNT'">
+            AND STATUS = 'PRD'
+        </if>
+        <if test="type == 'HOLD_COUNT'">
+            AND STATUS = 'Hold'
+        </if>
+        <if test="type == 'SBY_COUNT'">
+            AND STATUS = 'SBY'
+        </if>
+        <if test="type == 'ABORT_COUNT'">
+            AND STATUS = 'Abort'
+        </if>
+        ORDER BY CREATE_TIME, PTOOL_ID,JOB_SPEC_GROUP_ID
+    </select>
+
+    <select id="getOcsMonitorNGChartByEQPG" resultType="map">
+        SELECT
+        EQP_G XDATA,SUM(TOTAL_COUNT)TOTAL_COUNT,SUM(NG_COUNT)NG_COUNT
+        ,CASE WHEN SUM(TOTAL_COUNT) &gt; 0 THEN ROUND(SUM(NG_COUNT)*100/SUM(TOTAL_COUNT),1) END RATIO
+        FROM A1_MFG.OCS_MOVE_NG_SUMMARY
+        WHERE SHIFT_DATE = #{shiftDate,jdbcType=VARCHAR}
+        <if test="fab == 'N1A1'">
+            AND LENGTH(PTOOL_ID)=5
+        </if>
+        <if test="fab == 'N1A3'">
+            AND LENGTH(PTOOL_ID)=6
+        </if>
+        AND TEST_FOR = #{testFor,jdbcType=VARCHAR}
+        <if test="module != 'Total'">
+            AND MODULE = #{module,jdbcType=VARCHAR}
+        </if>
+        <if test="module == 'Total'">
+            AND NG_COUNT > 0
+        </if>
+        GROUP BY EQP_G
+    </select>
+
+    <select id="getOCSMonitorNGChartNew" resultType="map">
+        SELECT EQP_G,TOTAL_COUNT,NG_COUNT,OK_COUNT,NG_RATIO FROM(
+        SELECT
+        EQP_G ,SUM(TOTAL_COUNT)TOTAL_COUNT,SUM(NG_COUNT)NG_COUNT,SUM(TOTAL_COUNT-NG_COUNT)OK_COUNT
+        ,CASE WHEN SUM(TOTAL_COUNT) &gt; 0 THEN ROUND(SUM(NG_COUNT)*100/SUM(TOTAL_COUNT),1) END NG_RATIO
+        FROM A1_MFG.OCS_MOVE_NG_SUMMARY
+        WHERE TEST_FOR = #{mode,jdbcType=VARCHAR}
+        <if test="shiftDate !='' and shiftDate != null and shiftDate.size>0">
+            <foreach collection="shiftDate" item="item" open="AND SHIFT_DATE BETWEEN" separator=" AND " close="">#{item}</foreach>
+        </if>
+        <if test="shiftDate.size ==0">
+            AND SHIFT_DATE = TO_CHAR(SYSDATE-8/24-1,'YYYYMMDD')
+        </if>
+        <if test="fab == 'N1A1'">
+            AND LENGTH(PTOOL_ID)=5
+        </if>
+        <if test="fab == 'N1A3'">
+            AND LENGTH(PTOOL_ID)=6
+        </if>
+        <if test="module != 'all'">
+            AND MODULE = #{module,jdbcType=VARCHAR}
+        </if>
+        <if test="purpose !='' and purpose != null and purpose.size>0">
+            <foreach collection="purpose" item="item" open="AND PURPOSE IN(" separator="," close=")">#{item}</foreach>
+        </if>
+        GROUP BY EQP_G
+        )
+        WHERE 1=1
+        <if test="module == 'all'">
+            AND NG_COUNT > 0
+        </if>
+    </select>
+
+    <select id="getOcsMonitorNGChartByeqpId" resultType="map">
+        SELECT
+        PTOOL_ID XDATA,SUM(TOTAL_COUNT)TOTAL_COUNT,SUM(NG_COUNT)NG_COUNT
+        ,CASE WHEN SUM(TOTAL_COUNT) &gt; 0 THEN ROUND(SUM(NG_COUNT)*100/SUM(TOTAL_COUNT),1) END RATIO
+        FROM A1_MFG.OCS_MOVE_NG_SUMMARY
+        WHERE SHIFT_DATE = #{shiftDate,jdbcType=VARCHAR}
+        <if test="daynight != '' and daynight != null and daynight != 'TOTAL'">
+        AND DATE_TYPE=#{daynight,jdbcType=VARCHAR}
+        </if>
+        <if test="fab == 'N1A1'">
+            AND LENGTH(PTOOL_ID)=5
+        </if>
+        <if test="fab == 'N1A3'">
+            AND LENGTH(PTOOL_ID)=6
+        </if>
+        AND TEST_FOR = #{testFor,jdbcType=VARCHAR}
+        AND EQP_G = #{eqpg,jdbcType=VARCHAR}
+        GROUP BY PTOOL_ID
+    </select>
+
+    <select id="getOcsMonitorNGChartByDummy" resultType="map">
+        SELECT
+        DMY_PRODID XDATA,SUM(TOTAL_COUNT)TOTAL_COUNT,SUM(NG_COUNT)NG_COUNT
+        ,CASE WHEN SUM(TOTAL_COUNT) &gt; 0 THEN ROUND(SUM(NG_COUNT)*100/SUM(TOTAL_COUNT),1) END RATIO
+        FROM A1_MFG.OCS_MOVE_NG_SUMMARY
+        WHERE SHIFT_DATE = #{shiftDate,jdbcType=VARCHAR}
+        <if test="daynight != '' and daynight != null and daynight != 'TOTAL'">
+        AND DATE_TYPE=#{daynight,jdbcType=VARCHAR}
+        </if>
+        <if test="fab == 'N1A1'">
+            AND LENGTH(PTOOL_ID)=5
+        </if>
+        <if test="fab == 'N1A3'">
+            AND LENGTH(PTOOL_ID)=6
+        </if>
+        AND TEST_FOR = #{testFor,jdbcType=VARCHAR}
+        AND PTOOL_ID = #{eqpId,jdbcType=VARCHAR}
+        GROUP BY DMY_PRODID
+    </select>
+
+    <select id="getNgTrendChartSummary" resultType="map">
+        WITH BASE_INFO AS(
+        SELECT
+        SHIFT_DATE,SUM(NG_COUNT)NG_COUNT,SUM(TOTAL_COUNT)TOTAL_COUNT
+        FROM A1_MFG.OCS_MOVE_NG_SUMMARY
+        WHERE TEST_FOR = #{mode,jdbcType=VARCHAR}
+        <if test="fab !='' and fab != null and fab =='N1A1'">
+            AND LENGTH(PTOOL_ID)=5
+        </if>
+        <if test="fab !='' and fab != null and fab =='N1A3'">
+            AND LENGTH(PTOOL_ID)=6
+        </if>
+        <if test="eqpg !='' and eqpg != null and eqpg !='all'">
+            AND EQP_G = #{eqpg,jdbcType=VARCHAR}
+        </if>
+        <if test="module !='' and module != null and module !='all'">
+            AND MODULE = #{module,jdbcType=VARCHAR}
+        </if>
+        <if test="purpose !='' and purpose != null and purpose.size>0">
+            <foreach collection="purpose" item="item" open="AND PURPOSE IN(" separator="," close=")">#{item}</foreach>
+        </if>
+        GROUP BY SHIFT_DATE
+        ),DATE_LIST AS(
+        SELECT SHIFT_MONTH DATE_ITEM,SHIFT_DATE,1 DATE_FLAG FROM A3MFGYW1.CLIP_CALENDAR
+        WHERE SHIFT_MONTH BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE-8/24,-4),'YYYYMM') AND TO_CHAR(SYSDATE-8/24,'YYYYMM')
+        UNION ALL
+        SELECT WEEK_SEQ  DATE_ITEM,SHIFT_DATE,2 DATE_FLAG FROM A3MFGYW1.CLIP_CALENDAR
+        WHERE WEEK_SEQ IN (
+        SELECT WEEK_SEQ FROM A3MFGYW1.CLIP_CALENDAR  WHERE SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-8/24-28,'YYYYMMDD') AND  TO_CHAR(SYSDATE-8/24,'YYYYMMDD')
+        )
+        UNION ALL
+        SELECT SHIFT_DATE DATE_ITEM,SHIFT_DATE,3 DATE_FLAG FROM A3MFGYW1.CLIP_CALENDAR
+        WHERE SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-8/24-7,'YYYYMMDD') AND  TO_CHAR(SYSDATE-8/241,'YYYYMMDD')
+        )
+        SELECT DATE_ITEM
+        ,CASE WHEN DATE_COUNT&gt; 0 THEN ROUND(NG_COUNT/DATE_COUNT) ELSE 0 END NG_COUNT
+        ,CASE WHEN TOTAL_COUNT &gt;0 THEN ROUND(NG_COUNT*100/TOTAL_COUNT,1) ELSE 0 END NG_RATIO
+        FROM(
+        SELECT
+        A.DATE_ITEM,SUM(B.NG_COUNT)NG_COUNT,SUM(B.TOTAL_COUNT)TOTAL_COUNT,MAX(DATE_FLAG)DATE_FLAG,COUNT(B.SHIFT_DATE)DATE_COUNT
+        FROM DATE_LIST A
+        LEFT JOIN BASE_INFO B
+        ON A.SHIFT_DATE  = B.SHIFT_DATE
+        GROUP BY A.DATE_ITEM
+        )
+        ORDER BY DATE_FLAG,DATE_ITEM
+    </select>
+
+    <select id="geteqpgList" resultType="mfg.reporting.dto.CommonSelectDTO">
+        SELECT distinct EQP_G value ,EQP_G label FROM A1_MFG.OCS_MOVE_NG_SUMMARY
+        WHERE MODULE =#{module,jdbcType=VARCHAR} AND EQP_G IS NOT NULL
+        <if test="fab =='N1A1'">
+           AND LENGTH(PTOOL_ID) = 5
+        </if>
+        <if test="fab =='N1A3'">
+            AND LENGTH(PTOOL_ID) = 6
+        </if>
+    </select>
+
+    <select id="getpurposeList" resultType="mfg.reporting.dto.CommonSelectDTO">
+        SELECT distinct PURPOSE value ,PURPOSE label FROM A1_MFG.OCS_MOVE_NG_SUMMARY
+        WHERE PURPOSE IS NOT NULL
+        <if test="fab=='N1A1'">
+            and LENGTH(PTOOL_ID) = 5
+        </if>
+        <if test="fab=='N1A3'">
+            and LENGTH(PTOOL_ID) = 6
+        </if>
+    </select>
+
+    <select id="getNgDetailsByLot" resultType="map">
+        SELECT
+        A.*,B.DC_ITEM,B.DC_TYPE,B.DC_POS
+        ,CASE WHEN REGEXP_INSTR(UPLOAD_VALUE, '[^-0-9]') > 0
+        THEN ROUND(SUBSTR(UPLOAD_VALUE,1, REGEXP_INSTR(UPLOAD_VALUE, '[^0-9]')-1),3) ELSE ROUND(UPLOAD_VALUE,3) END UPLOAD_VALUE
+        ,B.SPEC_UPPER,B.SPEC_LOWER,B.CONTROL_UPPER,B.CONTROL_LOWER,B.WAFER_ID,B.WAFER_COUNT
+        ,B.SLOT,B.FOUP_ID
+        ,C.WAFERSOURCE,C.WAFERSOURCE2,C.PURPOSE PURPOSE2,D.EQP_G
+        FROM (
+        SELECT
+        ROW_NUMBER()OVER(PARTITION BY 1 ORDER BY  PROCESS_ED_TIME) RN,
+        PTOOL_ID,MTOOL_ID,FOUP_ID,RECIPE,JOB_SPEC_GROUP_PO_ID,JOB_SPEC_ID
+        ,MODULE,DC_CTRL_STATUS,DC_SPEC_STATUS,JOB_SPEC_GROUP_ID,CREATE_TIME,DMY_PRODID,LOTID,PROCESS_ST_TIME,PROCESS_ED_TIME,TEST_FOR,PURPOSE
+        ,CASE WHEN LENGTH(MTOOL_ID)= 5 THEN 'N1A1' ELSE 'N1A3' END FAB
+        ,SUBSTR(DMY_PRODID,1,INSTR(DMY_PRODID,'.')-1) CLAIM_MEMO
+        FROM A1_MFG.OCS_MONITOR_MOVE_DETAIL_HS
+        WHERE DC_SPEC_STATUS ='NG'
+        <if test="module !='' and module != null and module !='all'">
+            AND MODULE = #{module,jdbcType=VARCHAR}
+        </if>
+        <if test="shiftDate !='' and shiftDate != null and shiftDate.size>0">
+            <foreach collection="shiftDate" item="item" open="AND PROCESS_ED_TIME BETWEEN TO_DATE(" separator=",'YYYYMMDD')+7.5/24 AND TO_DATE(" close=",'YYYYMMDD')+1+7.5/24">#{item}</foreach>
+        </if>
+        <if test="shiftDate.size ==0">
+            AND PROCESS_ED_TIME BETWEEN TRUNC(SYSDATE-7.5/24-1)+7.5/24 AND  TRUNC(SYSDATE-7.5/24)+7.5/24
+        </if>
+        <if test="purpose !='' and purpose != null and purpose.size>0">
+            <foreach collection="purpose" item="item" open="AND PURPOSE IN(" separator="," close=")">#{item}</foreach>
+        </if>
+        <if test="purpose.size ==0">
+            AND  PURPOSE IN('RT','PM')
+        </if>
+        AND TEST_FOR = #{mode,jdbcType=VARCHAR}
+        <if test="fab == 'N1A1'">
+            AND LENGTH(PTOOL_ID)=5
+        </if>
+        <if test="fab == 'N1A3'">
+            AND LENGTH(PTOOL_ID)=6
+        </if>
+        ) A
+        LEFT  JOIN  A1_MFG.OCS_DC_NG_DETAILS B
+        ON A.JOB_SPEC_GROUP_PO_ID  = B.JOB_SPEC_GROUP_PO_ID
+        AND A.JOB_SPEC_GROUP_ID = B.JOB_SPEC_GROUP_ID
+        AND A.PTOOL_ID = B.PTOOL_ID
+        AND A.JOB_SPEC_ID  = B.JOB_SPEC_ID
+        AND A.RECIPE  = B.RECIPE
+        LEFT JOIN A1_MFG.NPW_TEST_FLOW  C
+        ON A.FAB = C.FAB AND A.CLAIM_MEMO  = C.CLAIM_MEMO
+        LEFT JOIN (
+        SELECT   EQP_G,EQP_ID  FROM  A3MFGYW1.PWEB_EQP_ID_USE_STD WHERE SHIFT_DATE =TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        )D
+        ON A.PTOOL_ID = D.EQP_ID
+    </select>
+
+    <select id="getCompeteRatioDaily" resultType="map">
+        WITH MODULE_LIST AS(
+        SELECT 'PHOTO' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'ETCH' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'TF' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'DIFF' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'WET' MODULE FROM DUAL
+        --        UNION ALL
+        --        SELECT 'CMP' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'METRO' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'TOTAL' MODULE FROM DUAL
+        ),DATE_LIST AS(
+        SELECT SHIFT_DATE FROM A3MFGYW1.CLIP_CALENDAR
+        WHERE SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') AND  TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        )
+        SELECT SHIFT_DATE,PHOTO_RATIO,ETCH_RATIO,TF_RATIO,DIFF_RATIO,WET_RATIO,METRO_RATIO,TOTAL_RATIO FROM(
+        SELECT C.*
+        ,CASE WHEN NVL(D.TOTAL_JOB_COUNT,0) &gt; 0 THEN
+        ROUND(D.COMPLETE_COUNT*100/D.TOTAL_JOB_COUNT ,1) END COMPLETE_RATIO
+        FROM(
+        SELECT A.SHIFT_DATE,B.MODULE  FROM DATE_LIST A
+        LEFT JOIN MODULE_LIST B
+        ON 1=1
+        ) C LEFT JOIN (
+        SELECT
+        SHIFT_DATE,NVL(MODULE,'TOTAL')MODULE , SUM(CASE WHEN JOBGROUP_STATUS IN('Confirm','Complete') THEN 1 ELSE 0 END ) COMPLETE_COUNT
+        ,COUNT(1) TOTAL_JOB_COUNT
+        FROM A1_MFG.OCS_MONITOR_PLAN_SETTING_DAILY
+        WHERE SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') AND  TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        <if test="fab == 'N1A1'">
+            AND LENGTH(TOOLID)=5
+        </if>
+        <if test="fab == 'N1A3'">
+            AND LENGTH(TOOLID)=6
+        </if>
+        GROUP BY SHIFT_DATE,ROLLUP(MODULE)
+        )D
+        ON C.SHIFT_DATE = D.SHIFT_DATE  AND C.MODULE = D.MODULE
+        )PIVOT(
+        MAX(COMPLETE_RATIO) FOR MODULE IN('PHOTO' AS PHOTO_RATIO,'ETCH' AS ETCH_RATIO,'TF' AS TF_RATIO,'DIFF' AS DIFF_RATIO,'WET' AS WET_RATIO,'METRO' AS METRO_RATIO,'TOTAL' AS TOTAL_RATIO)
+        )
+    </select>
+
+    <select id="getStayTimetrendChart" resultType="map">
+        SELECT A.SHIFT_DATE,B.AVG_STAY_TIME,B.STAY_TIME_TARGET FROM(
+        SELECT SHIFT_DATE FROM A3MFGYW1.CLIP_CALENDAR  WHERE SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD')
+        )A LEFT JOIN(
+        SELECT SHIFT_DATE,EQPG,MODULE,ROUND(AVG_STAY_TIME,1)AVG_STAY_TIME, ROUND(AVG_TM*2,1) STAY_TIME_TARGET
+        --,ROUND(AVG_CT,1) AVG_CT
+        FROM(
+        SELECT
+        SHIFT_DATE,NVL(EQPG,'all')EQPG,NVL(MODULE,'all')MODULE
+        ,SUM(STAY_TIME * QTY)/SUM(QTY) AVG_STAY_TIME
+        ,SUM(AVG_TM * QTY)/SUM(QTY) AVG_TM
+        --,SUM(AVG_CT * QTY)/SUM(QTY) AVG_CT
+        FROM A1_MFG.OCS_MONITOR_STAY_TIME_SUMMARY
+        WHERE SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-8/24-30,'YYYYMMDD') AND   TO_CHAR(SYSDATE-8/24,'YYYYMMDD')
+        AND FAB = #{fab}
+        <if test="purpose !='' and purpose != null and purpose.size>0">
+            <foreach collection="purpose" item="item" open="AND TEST_FOR IN(" separator="," close=")">#{item}</foreach>
+        </if>
+        GROUP BY SHIFT_DATE,ROLLUP(EQPG),ROLLUP(MODULE)
+        )WHERE EQPG = #{eqpg}AND MODULE = #{module}
+        )B
+        ON A.SHIFT_DATE = B.SHIFT_DATE
+        ORDER BY A.SHIFT_DATE
+    </select>
+</mapper>

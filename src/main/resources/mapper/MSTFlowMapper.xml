@@ -1,0 +1,1521 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.MSTFlowMapper">
+    <resultMap id="MstFlowSummaryDTOMap" type="mfg.reporting.dto.MstFlowSummaryDTO">
+        <result property="updateTime" column="UPDATE_TIME"/>
+        <result property="eqpg" column="EQP_G"/>
+        <result property="module" column="MODULE"/>
+        <result property="procStage" column="PROC_STAGE"/>
+        <result property="operSeq" column="OPE_SEQ"/>
+        <result property="operNo" column="OPE_NO"/>
+        <result property="foupCategory" column="FOUP_CATEGORY"/>
+        <result property="qtime" column="QTIME"/>
+        <result property="qtimeOperNo" column="S_OP"/>
+        <result property="sampling" column="SAMPLING"/>
+        <result property="totalWip" column="TOTAL_WIP"/>
+        <result property="totalWipSum" column="TOTAL_WIP_SUM"/>
+        <result property="runWip" column="RUN_WIP"/>
+        <result property="runQtimeFlag" column="Q_RUN_FLAG"/>
+        <result property="runSHLFlag" column="SHL_RUN_FLAG"/>
+        <result property="waitWip" column="WAIT_WIP"/>
+        <result property="waitQtimeFlag" column="Q_WAIT_FLAG"/>
+        <result property="waitSHLFlag" column="SHL_WAIT_FLAG"/>
+        <result property="waitTime" column="WAIT_TIME"/>
+        <result property="holdWip" column="HOLD_WIP"/>
+        <result property="holdQtimeFlag" column="Q_HOLD_FLAG"/>
+        <result property="holdSHLFlag" column="SHL_HOLD_FLAG"/>
+        <result property="holdTime" column="HOLD_TIME"/>
+        <result property="tdMove" column="TD_MOVE"/>
+        <result property="ydMove" column="YD_MOVE"/>
+        <result property="pre7dMove" column="PRE7D_MOVE"/>
+        <result property="stdCycRemain" column="STD_CT_REMAIN"/>
+        <result property="backupWip" column="BACKUP_WIP"/>
+        <result property="backupWipSum" column="BACKUP_SUM_WIP"/>
+        <result property="backupWipRun" column="BACKUP_RUN_WIP"/>
+        <result property="backupWipWait" column="BACKUP_WAIT_WIP"/>
+        <result property="backupWipWaitTime" column="BACKUP_WAIT_TIME"/>
+        <result property="backupWipHold" column="BACKUP_HOLD_WIP"/>
+        <result property="backupWipHoldTime" column="BACKUP_HOLD_TIME"/>
+        <result property="bankWip" column="BANK_WIP"/>
+        <result property="lotPriority" column="LOT_PRIORITY"/>
+        <result property="cutLineOpeNo" column="CUTLINE_OPE_NO"/>
+        <result property="sgsWip" column="SGS_WIP"/>
+    </resultMap>
+
+    <resultMap id="MstFlowWipDTOMap" type="mfg.reporting.dto.MstFlowWipDTO">
+        <result property="castId" column="CAST_ID"/>
+        <result property="prodg1" column="PRODG1"/>
+        <result property="prodspecId" column="PRODSPEC_ID"/>
+        <result property="fab" column="FAB"/>
+        <result property="locationFab" column="LOCATION_FAB"/>
+        <result property="lotID" column="LOT_ID"/>
+        <result property="mainpdId" column="MAINPD_ID"/>
+        <result property="operNo" column="OPE_NO"/>
+        <result property="eqpg" column="EQP_G"/>
+        <result property="path" column="PATH"/>
+        <result property="waferQty" column="WAFER_QTY"/>
+        <result property="lotPriority" column="LOT_PRIORITY"/>
+        <result property="priorityType" column="PRIORITY_TYPE"/>
+        <result property="sgsEqp" column="SGS_EQP"/>
+        <result property="subLotType" column="SUB_LOT_TYPE"/>
+        <result property="flowBatch" column="FLOWBATCH_ID"/>
+        <result property="batchFur" column="BATCH_FUR"/>
+        <result property="batchFlag" column="FLOWBATCH_FLAG"/>
+        <result property="eqpId" column="EQP_ID"/>
+        <result property="xferState" column="XFER_STATE"/>
+        <result property="state" column="STATE"/>
+        <result property="duration" column="DURATION"/>
+        <result property="remainQtime" column="REMAIN_QTIME"/>
+        <result property="triggerOpNo" column="TRIGGER_OP_NO"/>
+        <result property="targetOpNo" column="TARGET_OP_NO"/>
+        <result property="targetTime" column="TARGET_TIME"/>
+        <result property="holdComment" column="HOLD_COMMENT"/>
+        <result property="sampling" column="SAMPLING"/>
+        <result property="remainLayer" column="REMAIN_LAYER"/>
+    </resultMap>
+
+    <resultMap id="MstFlowMoveByProdgDTOMap" type="mfg.reporting.dto.MstFlowMoveByProdgDTO">
+        <result property="shiftDate" column="SHIFT_DATE"/>
+        <result property="prodg1" column="PRODG1"/>
+        <result property="mainpdId" column="MAINPD_ID"/>
+        <result property="operNo" column="OPE_NO"/>
+        <result property="move" column="MOVE"/>
+        <result property="locationFab" column="LOCATION_FAB"/>
+        <result property="fab" column="FAB"/>
+    </resultMap>
+
+    <resultMap id="MstFlowMoveByEqpgDTOMap" type="mfg.reporting.dto.MstFlowMoveByEqpgDTO">
+        <result property="shiftDate" column="SHIFT_DATE"/>
+        <result property="eqpId" column="EQP_ID"/>
+        <result property="prodg1" column="PRODG1"/>
+        <result property="mainpdId" column="MAINPD_ID"/>
+        <result property="operNo" column="OPE_NO"/>
+        <result property="move" column="MOVE"/>
+        <result property="locationFab" column="LOCATION_FAB"/>
+        <result property="fab" column="FAB"/>
+    </resultMap>
+
+    <resultMap id="MstFlowQtimeDTOMap" type="mfg.reporting.dto.MstFlowQtimeDTO">
+        <result property="customer" column="CUSTOMER"/>
+        <result property="ctg" column="CT_G"/>
+        <result property="prodg1" column="PRODG1"/>
+        <result property="prodspecId" column="PRODSPEC_ID"/>
+        <result property="flowKey" column="FLOW_KEY"/>
+        <result property="qtimeStartOpe" column="FROM_OPE_NO"/>
+        <result property="qtimeEndOpe" column="TO_OPE_NO"/>
+        <result property="qtimeStep" column="QTIME_STEP"/>
+        <result property="qtimeLimit" column="QTIME_LIMIT"/>
+    </resultMap>
+
+    <resultMap id="MstFlowSamplingDTOMap" type="mfg.reporting.dto.MstFlowSamplingDTO">
+        <result property="customer" column="CUSTOMER"/>
+        <result property="ctg" column="CT_G"/>
+        <result property="prodg1" column="PRODG1"/>
+        <result property="prodspecId" column="PRODSPEC_ID"/>
+        <result property="module" column="MODULE"/>
+        <result property="operNo" column="OPE_NO"/>
+        <result property="mainSuffix" column="MAIN_SUFFIX"/>
+        <result property="samplingRate" column="SAMPLING_RATE"/>
+    </resultMap>
+
+    <resultMap id="MstFlowLotOpeDTOMap" type="mfg.reporting.dto.MstFlowLotOpeHsDTO">
+        <result property="locationFab" column="LOCATION_FAB"/>
+        <result property="mainpdId" column="MAINPD_ID"/>
+        <result property="operNo" column="OPE_NO"/>
+        <result property="claimTime" column="CLAIM_TIME"/>
+        <result property="claimUser" column="CLAIM_USER_ID"/>
+        <result property="opeCategory" column="OPE_CATEGORY"/>
+        <result property="eqpId" column="EQP_ID"/>
+        <result property="claimMemo" column="CLAIM_MEMO"/>
+        <result property="opeMode" column="OPE_MODE"/>
+        <result property="holdUser" column="HOLD_USER_ID"/>
+        <result property="reasonCode" column="REASON_CODE"/>
+        <result property="flowbatchId" column="FLOWBATCH_ID"/>
+    </resultMap>
+
+    <resultMap id="MstFlowPathDTOMap" type="mfg.reporting.dto.MstFlowPathDTO">
+        <result property="locationFab" column="LOCATION_FAB"/>
+        <result property="prodg1" column="PRODG1"/>
+        <result property="prodspecId" column="PRODSPEC_ID"/>
+        <result property="routeId" column="ROUTE"/>
+        <result property="operNo" column="OPE_NO"/>
+        <result property="eqpId" column="EQP_ID"/>
+        <result property="procUseFlag" column="PROC_USE_FLAG"/>
+        <result property="procUpdateUser" column="PROC_UPT_USER"/>
+        <result property="procUpdateTime" column="PROC_UPT_TIME"/>
+        <result property="mfgUseFlag" column="MFG_USE_FLAG"/>
+        <result property="mfgUpdateUser" column="MFG_UPT_USER"/>
+        <result property="mfgUpdateTime" column="MFG_UPT_TIME"/>
+    </resultMap>
+
+    <resultMap id="MstFlowDybDTOMap" type="mfg.reporting.dto.MstFlowDybDTO">
+        <result property="Fab" column="FAB"/>
+        <result property="locationFab" column="LOCATION_FAB"/>
+        <result property="prodg1" column="PRODG1"/>
+        <result property="lotId" column="LOT_ID"/>
+        <result property="routeId" column="MAINPD_ID"/>
+        <result property="operNo" column="OPE_NO"/>
+        <result property="preOperNo" column="PREV_OPE_NO"/>
+        <result property="waferQty" column="WAFER_QTY"/>
+    </resultMap>
+
+    <resultMap id="MstFlowSgsDTOMap" type="mfg.reporting.dto.MstFlowSgsDTO">
+        <result property="prodg1" column="PRODG1"/>
+        <result property="operNo" column="OPE_NO"/>
+        <result property="sgsEqp" column="SGS_EQP"/>
+        <result property="sgsWip" column="SGS_WIP"/>
+    </resultMap>
+
+    <sql id="nengCondition">
+        <if test="neng == 'all'">
+            AND A.NENG_FLAG LIKE '%'
+        </if>
+        <if test="neng != 'all'">
+            AND A.NENG_FLAG = #{neng}
+        </if>
+    </sql>
+
+    <sql id="viewCondition">
+        <choose>
+            <when test="view == '1'.toString()">
+                AND A.FAB='N1A1' AND A.LOCATION_FAB='N1A1'
+            </when>
+            <when test="view == '2'.toString()">
+                AND A.FAB='N1A1' AND A.LOCATION_FAB='N1A3'
+            </when>
+            <when test="view == '3'.toString()">
+                AND A.FAB='N1A3' AND A.LOCATION_FAB='N1A3'
+            </when>
+            <when test="view == '4'.toString()">
+                AND A.FAB='N1A3' AND A.LOCATION_FAB='N1A1'
+            </when>
+            <when test="view == '12'.toString()">
+                AND A.FAB='N1A1'
+            </when>
+            <when test="view == '34'.toString()">
+                AND A.FAB='N1A3'
+            </when>
+            <when test="view == '14'.toString()">
+                AND A.LOCATION_FAB='N1A1'
+            </when>
+            <when test="view == '23'.toString()">
+                AND A.LOCATION_FAB='N1A3'
+            </when>
+            <when test="view == '1234'.toString()">
+                AND A.FAB LIKE '%' AND A.LOCATION_FAB LIKE '%'
+            </when>
+        </choose>
+    </sql>
+
+    <sql id="cutlineViewCondition">
+        <choose>
+            <when test="view == '1'.toString() or view == '2'.toString() or view == '12'.toString()">
+                AND A.FAB = 'N1A1'
+            </when>
+            <when test="view == '3'.toString() or view == '4'.toString() or view == '34'.toString()">
+                AND A.FAB = 'N1A3'
+            </when>
+            <otherwise>
+                AND A.FAB = ''
+            </otherwise>
+        </choose>
+    </sql>
+
+    <select id="getMstFlowSummary" resultMap="MstFlowSummaryDTOMap">
+        <if test="prodg == 'all'">
+            WITH TD_MOVE AS (
+            SELECT B.TECH, A.OPE_NO, SUM(A.WAFER_QTY) AS TD_MOVE
+            FROM A1MFG.PR_MOVE_LIST_TD A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.TECH_FLAG ='Y'
+            WHERE 1=1
+            <include refid="nengCondition"/>
+
+            <include refid="viewCondition"/>
+
+            GROUP BY B.TECH, A.OPE_NO
+            )
+            , YD_MOVE AS (
+            SELECT B.TECH, A.OPE_NO, SUM(A.WAFER_QTY) AS YD_MOVE
+            FROM A1MFG.PH_MOVE_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.TECH_FLAG ='Y'
+            WHERE 1=1
+            AND A.SHIFT_DATE =TO_CHAR(SYSDATE -7.5/24 -1,'YYYYMMDD')
+            <include refid="nengCondition"/>
+
+            <include refid="viewCondition"/>
+
+            GROUP BY B.TECH, A.OPE_NO
+            )
+            , PRE7D_MOVE AS (
+            SELECT B.TECH, A.OPE_NO, ROUND(SUM(A.WAFER_QTY)/7,0) AS PRE7D_MOVE
+            FROM A1MFG.PH_MOVE_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.TECH_FLAG ='Y'
+            WHERE 1=1
+            AND A.SHIFT_DATE &lt;= TO_CHAR(SYSDATE -7.5/24 -1,'YYYYMMDD')
+            AND A.SHIFT_DATE >=TO_CHAR(SYSDATE -7.5/24 -7,'YYYYMMDD')
+            <include refid="nengCondition"/>
+
+            <include refid="viewCondition"/>
+
+            GROUP BY B.TECH, A.OPE_NO
+            )
+            , WIP_DATA AS (
+            SELECT B.TECH, A.*
+            FROM A1MFG.PR_WIP_SUM_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.TECH_FLAG ='Y'
+            WHERE 1=1
+            <include refid="nengCondition"/>
+
+            <include refid="viewCondition"/>
+
+            )
+            , WIP_SUMMARY AS (
+            SELECT A.TECH
+            , A.OPE_NO
+            , MIN(A.LOT_PRIORITY) AS LOT_PRIORITY
+            , SUM(CASE WHEN A.STATE IN('RUN','HOLD','WAIT') THEN A.WAFER_QTY END) TOTAL_WIP
+            , SUM(CASE WHEN A.STATE='WAIT' AND A.REMAIN_QTIME &lt;&gt; 0.0 THEN 1 ELSE 0 END) Q_WAIT_WIP
+            , SUM(CASE WHEN A.STATE='HOLD' AND A.REMAIN_QTIME &lt;&gt; 0.0 THEN 1 ELSE 0 END) Q_HOLD_WIP
+            , SUM(CASE WHEN A.STATE='RUN' AND A.REMAIN_QTIME &lt;&gt; 0.0  THEN 1 ELSE 0 END) Q_RUN_WIP
+            , SUM(CASE WHEN A.STATE='WAIT' AND A.SHL_FLAG='Y' AND A.LOT_PRIORITY >=1 AND A.LOT_PRIORITY &lt;=69 THEN 1 ELSE 0 END) SHL_WAIT_WIP
+            , SUM(CASE WHEN A.STATE='HOLD' AND A.SHL_FLAG='Y' AND A.LOT_PRIORITY >=1 AND A.LOT_PRIORITY &lt;=69 THEN 1 ELSE 0 END) SHL_HOLD_WIP
+            , SUM(CASE WHEN A.STATE='RUN' AND A.SHL_FLAG='Y' AND A.LOT_PRIORITY >=1 AND A.LOT_PRIORITY &lt;=69 THEN 1 ELSE 0 END) SHL_RUN_WIP
+            , MAX(CASE WHEN A.OPE_NO=A.TARGET_OP_NO THEN A.QTIME_SPEC ELSE 0 END) QTIME_SPEC
+            , SUM(CASE WHEN A.STATE='RUN' THEN A.WAFER_QTY END) RUN_WIP
+            , SUM(CASE WHEN A.STATE='BANK' THEN A.WAFER_QTY END) BANK_WIP
+            , SUM(CASE WHEN A.STATE='WAIT' THEN A.WAFER_QTY END) WAIT_WIP
+            , AVG(CASE WHEN A.STATE='WAIT' THEN A.WAIT_TIME ELSE NULL END) WAIT_TIME
+            , SUM(CASE WHEN A.STATE='HOLD' THEN A.WAFER_QTY END ) HOLD_WIP
+            , AVG(CASE WHEN A.STATE='HOLD' THEN A.HOLD_TIME ELSE NULL END) HOLD_TIME
+            --, SUM(CASE WHEN A.STATE='CAPBANK' THEN QTY ELSE 0 END) A_MFG_BANK
+            , SUM(CASE WHEN SUBSTR(A.PRODG1,1,4)='NX11' THEN A.WAFER_QTY END) NEX
+            , SUM(CASE WHEN A.SGS_VALUE IS NOT NULL THEN A.WAFER_QTY END) SGS_WIP
+            FROM WIP_DATA A
+            GROUP BY A.TECH, A.OPE_NO
+            )
+            , BACKUP_WIP AS (
+            SELECT B.TECH
+            , A.OPE_NO
+            , SUM(CASE WHEN A.STATE IN('RUN','HOLD','WAIT') THEN A.WAFER_QTY END) BACKUP_WIP
+            , SUM(CASE WHEN A.STATE='RUN' THEN A.WAFER_QTY END) BACKUP_RUN_WIP
+            , SUM(CASE WHEN A.STATE='WAIT' THEN A.WAFER_QTY END) BACKUP_WAIT_WIP
+            , AVG(CASE WHEN A.STATE='WAIT' THEN A.WAIT_TIME ELSE NULL END) BACKUP_WAIT_TIME
+            , SUM(CASE WHEN A.STATE='HOLD' THEN A.WAFER_QTY END ) BACKUP_HOLD_WIP
+            , AVG(CASE WHEN A.STATE='HOLD' THEN A.HOLD_TIME ELSE NULL END) BACKUP_HOLD_TIME
+            FROM A1MFG.PR_WIP_SUM_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.TECH_FLAG ='Y'
+            WHERE 1=1
+            <include refid="nengCondition"/>
+
+
+            <if test="view == '12'.toString()">
+                AND A.FAB='N1A1' AND A.LOCATION_FAB='N1A3'
+            </if>
+            <if test="view == '34'.toString()">
+                AND A.FAB='N1A3' AND A.LOCATION_FAB='N1A1'
+            </if>
+            <if test="view != '12'.toString() and view != '34'.toString()">
+                AND A.FAB='N1A1' AND A.LOCATION_FAB='N1A1'
+            </if>
+
+            GROUP BY B.TECH, A.OPE_NO
+            )
+            , CUTLINE_DATA AS (
+            SELECT A.TECH, A.PROC_STAGE, OPE_NO, A.CUT_COMMENT AS CUT_COMMENT
+            FROM A3MFGYW1.PROFILE_TECH_CUT_COMMENT@TO_A3MFG A
+            WHERE A.TECH =#{tech}
+            <include refid="cutlineViewCondition"/>
+            )
+            , UPDATE_TIME AS (
+            SELECT MAX(UPDATE_TIME) AS UPDATE_TIME FROM A1MFG.PR_WIP_SUM_LIST
+            )
+            SELECT TO_CHAR(L.UPDATE_TIME, 'YYYY-MM-DD HH24:MI:SS') AS UPDATE_TIME
+            , A.OPE_SEQ
+            , A.MODULE
+            , A.EQP_G
+            , A.PROC_STAGE
+            , A.OPE_NO
+            , A.FOUP_CATEGORY
+            , A.S_OP
+            , A.QTIME
+            , CASE WHEN A.RATE IS NOT NULL THEN A.RATE || '%' END AS SAMPLING
+            , ROUND(A.STD_CT_REMAIN,1) AS STD_CT_REMAIN
+            , B.LOT_PRIORITY
+            , B.TOTAL_WIP
+            , SUM(NVL(B.TOTAL_WIP,0)) OVER (ORDER BY A.OPE_SEQ DESC) AS TOTAL_WIP_SUM
+            , CASE WHEN B.Q_WAIT_WIP IS NOT NULL AND B.Q_WAIT_WIP &lt;&gt; 0 THEN 'Y' ELSE 'N' END AS Q_WAIT_FLAG
+            , CASE WHEN B.Q_HOLD_WIP IS NOT NULL AND B.Q_HOLD_WIP &lt;&gt; 0 THEN 'Y' ELSE 'N' END AS Q_HOLD_FLAG
+            , CASE WHEN B.Q_RUN_WIP IS NOT NULL AND B.Q_RUN_WIP &lt;&gt; 0 THEN 'Y' ELSE 'N' END AS Q_RUN_FLAG
+            , CASE WHEN B.SHL_WAIT_WIP IS NOT NULL AND B.SHL_WAIT_WIP &lt;&gt; 0 THEN 'Y' ELSE 'N' END AS SHL_WAIT_FLAG
+            , CASE WHEN B.SHL_HOLD_WIP IS NOT NULL AND B.SHL_HOLD_WIP &lt;&gt; 0 THEN 'Y' ELSE 'N' END AS SHL_HOLD_FLAG
+            , CASE WHEN B.SHL_RUN_WIP IS NOT NULL AND B.SHL_RUN_WIP &lt;&gt; 0 THEN 'Y' ELSE 'N' END AS SHL_RUN_FLAG
+            , B.RUN_WIP
+            , B.WAIT_WIP
+            , ROUND(B.WAIT_TIME,1) AS WAIT_TIME
+            , B.HOLD_WIP
+            , ROUND(B.HOLD_TIME,1) AS HOLD_TIME
+            , B.BANK_WIP
+            , B.NEX
+            , C.BACKUP_WIP
+            , SUM(NVL(C.BACKUP_WIP,0)) OVER (ORDER BY A.OPE_SEQ DESC) AS BACKUP_SUM_WIP
+            , C.BACKUP_RUN_WIP
+            , C.BACKUP_WAIT_WIP
+            , ROUND(C.BACKUP_WAIT_TIME,1) AS BACKUP_WAIT_TIME
+            , C.BACKUP_HOLD_WIP
+            , ROUND(C.BACKUP_HOLD_TIME,1) AS BACKUP_HOLD_TIME
+            , E.TD_MOVE
+            , F.YD_MOVE
+            , G.PRE7D_MOVE
+            , M.OPE_NO AS CUTLINE_OPE_NO
+            , B.SGS_WIP
+            FROM A1MFG.TECH_FLOW_MAINTAIN A
+            LEFT JOIN WIP_SUMMARY B ON A.TECH =B.TECH AND A.OPE_NO = B.OPE_NO
+            LEFT JOIN BACKUP_WIP C ON A.TECH =C.TECH AND A.OPE_NO = C.OPE_NO
+            LEFT JOIN TD_MOVE E ON A.TECH =E.TECH AND A.OPE_NO = E.OPE_NO
+            LEFT JOIN YD_MOVE F ON A.TECH =F.TECH AND A.OPE_NO = F.OPE_NO
+            LEFT JOIN PRE7D_MOVE G ON A.TECH =G.TECH AND A.OPE_NO = G.OPE_NO
+            LEFT JOIN UPDATE_TIME L ON 1=1
+            LEFT JOIN CUTLINE_DATA M ON A.TECH =M.TECH AND A.OPE_NO = M.OPE_NO
+            WHERE 1=1
+            AND A.TECH =#{tech}
+
+            <if test="module == 'all'">
+                AND (A.MODULE LIKE '%' OR A.MODULE IS NULL)
+            </if>
+            <if test="module == 'WCS'">
+                AND A.MODULE IN ('WET','CMP')
+            </if>
+            <if test="module != 'all' and module != 'WCS'">
+                AND A.MODULE=#{module}
+            </if>
+
+            <if test="eqpg == 'all'">
+                AND (A.EQP_G LIKE '%' OR A.EQP_G IS NULL)
+            </if>
+            <if test="eqpg != 'all'">
+                AND A.EQP_G=#{eqpg}
+            </if>
+
+            ORDER BY A.OPE_SEQ
+
+        </if>
+
+        <if test="prodg != 'all'">
+
+            WITH TD_MOVE AS (
+            SELECT B.TECH, A.FINAL_PRODG1 AS PRODG1, A.OPE_NO, SUM(A.WAFER_QTY) AS TD_MOVE
+            FROM A1MFG.PR_MOVE_LIST_TD A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1  AND B.TECH =#{tech} AND B.PRODG1 =#{prodg}
+            WHERE 1=1
+            <include refid="nengCondition"/>
+
+            <include refid="viewCondition"/>
+
+            GROUP BY B.TECH, A.FINAL_PRODG1, A.OPE_NO
+            )
+            , YD_MOVE AS (
+            SELECT B.TECH, A.FINAL_PRODG1 AS PRODG1, A.OPE_NO, SUM(A.WAFER_QTY) AS YD_MOVE
+            FROM A1MFG.PH_MOVE_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1  AND B.TECH =#{tech} AND B.PRODG1 =#{prodg}
+            WHERE 1=1
+            <include refid="nengCondition"/>
+
+            <include refid="viewCondition"/>
+
+            AND A.SHIFT_DATE =TO_CHAR(SYSDATE -7.5/24 -1,'YYYYMMDD')
+            GROUP BY B.TECH, A.FINAL_PRODG1, A.OPE_NO
+            )
+            , PRE7D_MOVE AS (
+            SELECT B.TECH, A.FINAL_PRODG1 AS PRODG1, A.OPE_NO, ROUND(SUM(A.WAFER_QTY)/7,0) AS PRE7D_MOVE
+            FROM A1MFG.PH_MOVE_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.PRODG1 =#{prodg}
+            WHERE 1=1
+            <include refid="nengCondition"/>
+
+            <include refid="viewCondition"/>
+
+            AND A.SHIFT_DATE &lt;= TO_CHAR(SYSDATE -7.5/24 -1,'YYYYMMDD')
+            AND A.SHIFT_DATE >=TO_CHAR(SYSDATE -7.5/24 -7,'YYYYMMDD')
+            GROUP BY B.TECH, A.FINAL_PRODG1, A.OPE_NO
+            )
+            , WIP_DATA AS (
+            SELECT B.TECH, A.*
+            FROM A1MFG.PR_WIP_SUM_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.PRODG1 =#{prodg}
+            WHERE 1=1
+            <include refid="nengCondition"/>
+
+            <include refid="viewCondition"/>
+
+            )
+            , WIP_SUMMARY AS (
+            SELECT A.TECH
+            , A.OPE_NO
+            , MIN(A.LOT_PRIORITY) AS LOT_PRIORITY
+            , SUM(CASE WHEN A.STATE IN('RUN','HOLD','WAIT') THEN A.WAFER_QTY END) TOTAL_WIP
+            , SUM(CASE WHEN A.STATE='WAIT' AND A.REMAIN_QTIME &lt;&gt; 0.0 THEN 1 ELSE 0 END) Q_WAIT_WIP
+            , SUM(CASE WHEN A.STATE='HOLD' AND A.REMAIN_QTIME &lt;&gt; 0.0 THEN 1 ELSE 0 END) Q_HOLD_WIP
+            , SUM(CASE WHEN A.STATE='RUN' AND A.REMAIN_QTIME &lt;&gt; 0.0  THEN 1 ELSE 0 END) Q_RUN_WIP
+            , SUM(CASE WHEN A.STATE='WAIT' AND A.SHL_FLAG='Y' AND A.LOT_PRIORITY >=1 AND A.LOT_PRIORITY &lt;=69 THEN 1 ELSE 0 END) SHL_WAIT_WIP
+            , SUM(CASE WHEN A.STATE='HOLD' AND A.SHL_FLAG='Y' AND A.LOT_PRIORITY >=1 AND A.LOT_PRIORITY &lt;=69 THEN 1 ELSE 0 END) SHL_HOLD_WIP
+            , SUM(CASE WHEN A.STATE='RUN' AND A.SHL_FLAG='Y' AND A.LOT_PRIORITY >=1 AND A.LOT_PRIORITY &lt;=69 THEN 1 ELSE 0 END) SHL_RUN_WIP
+            , MAX(CASE WHEN A.OPE_NO=A.TARGET_OP_NO THEN A.QTIME_SPEC ELSE 0 END) QTIME_SPEC
+            , SUM(CASE WHEN A.STATE='RUN' THEN A.WAFER_QTY END) RUN_WIP
+            , SUM(CASE WHEN A.STATE='BANK' THEN A.WAFER_QTY END) BANK_WIP
+            , SUM(CASE WHEN A.STATE='WAIT' THEN A.WAFER_QTY END) WAIT_WIP
+            , AVG(CASE WHEN A.STATE='WAIT' THEN A.WAIT_TIME ELSE NULL END) WAIT_TIME
+            , SUM(CASE WHEN A.STATE='HOLD' THEN A.WAFER_QTY END ) HOLD_WIP
+            , AVG(CASE WHEN A.STATE='HOLD' THEN A.HOLD_TIME ELSE NULL END) HOLD_TIME
+            , SUM(CASE WHEN SUBSTR(A.PRODG1,1,4)='NX11' THEN A.WAFER_QTY END) NEX
+            , SUM(CASE WHEN A.SGS_VALUE IS NOT NULL THEN A.WAFER_QTY END) SGS_WIP
+            FROM WIP_DATA A
+            GROUP BY A.TECH, A.OPE_NO
+            )
+            , BACKUP_WIP AS (
+            SELECT B.TECH
+            , A.FINAL_PRODG1 AS PRODG1
+            , A.OPE_NO
+            , SUM(CASE WHEN A.STATE IN('RUN','HOLD','WAIT') THEN A.WAFER_QTY END) BACKUP_WIP
+            , SUM(CASE WHEN A.STATE='RUN' THEN A.WAFER_QTY END) BACKUP_RUN_WIP
+            , SUM(CASE WHEN A.STATE='WAIT' THEN A.WAFER_QTY END) BACKUP_WAIT_WIP
+            , AVG(CASE WHEN A.STATE='WAIT' THEN A.WAIT_TIME ELSE NULL END) BACKUP_WAIT_TIME
+            , SUM(CASE WHEN A.STATE='HOLD' THEN A.WAFER_QTY END ) BACKUP_HOLD_WIP
+            , AVG(CASE WHEN A.STATE='HOLD' THEN A.HOLD_TIME ELSE NULL END) BACKUP_HOLD_TIME
+            FROM A1MFG.PR_WIP_SUM_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.PRODG1 =#{prodg}
+            WHERE 1=1
+            <include refid="nengCondition"/>
+
+            <if test="view == '12'.toString()">
+                AND A.FAB='N1A1' AND A.LOCATION_FAB='N1A3'
+            </if>
+            <if test="view == '34'.toString()">
+                AND A.FAB='N1A3' AND A.LOCATION_FAB='N1A1'
+            </if>
+            <if test="view != '12'.toString() and view != '34'.toString()">
+                AND A.FAB='N1A1' AND A.LOCATION_FAB='N1A1'
+            </if>
+
+            GROUP BY B.TECH, A.FINAL_PRODG1, A.OPE_NO
+            )
+            , TO_OPE_DATA AS (
+            SELECT DISTINCT FINAL_PRODG1 AS PRODG1
+            , FROM_OPE_NO
+            , TO_OPE_NO
+            , MIN(SUBSTR(TO_OPE_NO, 4, 5)) AS S_OP
+            FROM A1MFG.FLOW_QTIME_CONSTRAINT_ALL
+            WHERE FINAL_PRODG1 =#{prodg}
+            GROUP BY FINAL_PRODG1, FROM_OPE_NO, TO_OPE_NO
+            )
+            , QTIME_DATA AS (
+            SELECT DISTINCT FINAL_PRODG1 AS PRODG1
+            , FROM_OPE_NO
+            , TO_OPE_NO
+            , MIN(QTIME_LIMIT) AS QTIME
+            FROM A1MFG.FLOW_QTIME_CONSTRAINT_ALL
+            WHERE FINAL_PRODG1 =#{prodg}
+            GROUP BY FINAL_PRODG1, TO_OPE_NO, FROM_OPE_NO
+            )
+            , SAMPLING_DATA AS (
+            SELECT DISTINCT FINAL_PRODG1 AS PRODG1
+            , OPE_NO
+            , ROUND(AVG(CASE WHEN MAINCHIP='1' THEN NVL(SAMPLING_RATE,0) END *100.00),1) AS RATE
+            FROM A1MFG.V_FLOW_SAMPLING_RATE_ALL
+            WHERE FINAL_PRODG1 =#{prodg}
+            GROUP BY FINAL_PRODG1, OPE_NO
+            )
+            , CUTLINE_DATA AS (
+            SELECT A.PRODG1, A.CUTLINE_OPE_NO
+            FROM A3MFGYW1.OUTPUT_CUTLINE@TO_A3MFG A
+            WHERE A.CUTLINE_NEED>=1
+            AND A.PRODG1 =#{prodg}
+            <include refid="cutlineViewCondition"/>
+            )
+            , UPDATE_TIME AS (
+            SELECT MAX(UPDATE_TIME) AS UPDATE_TIME FROM A1MFG.PR_WIP_SUM_LIST
+            )
+            SELECT DISTINCT TO_CHAR(L.UPDATE_TIME, 'YYYY-MM-DD HH24:MI:SS') AS UPDATE_TIME
+            , A.OPER_SEQ AS OPE_SEQ
+            , A.MODULE
+            , A.EQP_G
+            , A.PROC_STAGE
+            , A.OPER_NO AS OPE_NO
+            , A.FOUP_CATEGORY
+            , J.S_OP
+            , H.QTIME
+            , CASE WHEN K.RATE IS NOT NULL THEN K.RATE || '%' END AS SAMPLING
+            , ROUND(A.REMAIN_CT_ACC/24,1) AS STD_CT_REMAIN
+            , B.LOT_PRIORITY
+            , B.TOTAL_WIP
+            , SUM(NVL(B.TOTAL_WIP,0)) OVER (ORDER BY A.OPER_SEQ DESC) AS TOTAL_WIP_SUM
+            , CASE WHEN B.Q_WAIT_WIP IS NOT NULL AND B.Q_WAIT_WIP &lt;&gt; 0 THEN 'Y' ELSE 'N' END AS Q_WAIT_FLAG
+            , CASE WHEN B.Q_HOLD_WIP IS NOT NULL AND B.Q_HOLD_WIP &lt;&gt; 0 THEN 'Y' ELSE 'N' END AS Q_HOLD_FLAG
+            , CASE WHEN B.Q_RUN_WIP IS NOT NULL AND B.Q_RUN_WIP &lt;&gt; 0 THEN 'Y' ELSE 'N' END AS Q_RUN_FLAG
+            , CASE WHEN B.SHL_WAIT_WIP IS NOT NULL AND B.SHL_WAIT_WIP &lt;&gt; 0 THEN 'Y' ELSE 'N' END AS SHL_WAIT_FLAG
+            , CASE WHEN B.SHL_HOLD_WIP IS NOT NULL AND B.SHL_HOLD_WIP &lt;&gt; 0 THEN 'Y' ELSE 'N' END AS SHL_HOLD_FLAG
+            , CASE WHEN B.SHL_RUN_WIP IS NOT NULL AND B.SHL_RUN_WIP &lt;&gt; 0 THEN 'Y' ELSE 'N' END AS SHL_RUN_FLAG
+            , B.RUN_WIP
+            , B.WAIT_WIP
+            , ROUND(B.WAIT_TIME,1) AS WAIT_TIME
+            , B.HOLD_WIP
+            , ROUND(B.HOLD_TIME,1) AS HOLD_TIME
+            , B.BANK_WIP
+            , B.NEX
+            , C.BACKUP_WIP
+            , SUM(NVL(C.BACKUP_WIP,0)) OVER (ORDER BY A.OPER_SEQ DESC) AS BACKUP_SUM_WIP
+            , C.BACKUP_RUN_WIP
+            , C.BACKUP_WAIT_WIP
+            , ROUND(C.BACKUP_WAIT_TIME,1) AS BACKUP_WAIT_TIME
+            , C.BACKUP_HOLD_WIP
+            , ROUND(C.BACKUP_HOLD_TIME,1) AS BACKUP_HOLD_TIME
+            , E.TD_MOVE
+            , F.YD_MOVE
+            , G.PRE7D_MOVE
+            , M.CUTLINE_OPE_NO
+            , B.SGS_WIP
+            FROM A1MFG.MST_FLOW_PRODG_ALL_FLOW A
+            LEFT JOIN WIP_SUMMARY B ON  A.OPER_NO = B.OPE_NO
+            LEFT JOIN BACKUP_WIP C ON A.OPER_NO = C.OPE_NO
+            LEFT JOIN TD_MOVE E ON A.OPER_NO = E.OPE_NO
+            LEFT JOIN YD_MOVE F ON A.OPER_NO = F.OPE_NO
+            LEFT JOIN PRE7D_MOVE G ON A.OPER_NO = G.OPE_NO
+            LEFT JOIN QTIME_DATA H ON A.PRODG1=H.PRODG1 AND A.OPER_NO =H.FROM_OPE_NO
+            LEFT JOIN SAMPLING_DATA K ON A.PRODG1=K.PRODG1 AND A.OPER_NO =K.OPE_NO
+            LEFT JOIN TO_OPE_DATA J ON A.PRODG1=J.PRODG1 AND A.OPER_NO =J.TO_OPE_NO
+            LEFT JOIN CUTLINE_DATA M ON A.PRODG1=M.PRODG1 AND A.OPER_NO =M.CUTLINE_OPE_NO
+            LEFT JOIN UPDATE_TIME L ON 1=1
+            WHERE 1=1
+            AND A.PRODG1 =#{prodg}
+
+            <if test="module == 'all'">
+                AND (A.MODULE LIKE '%' OR A.MODULE IS NULL)
+            </if>
+            <if test="module == 'WCS'">
+                AND A.MODULE IN ('WET','CMP')
+            </if>
+            <if test="module != 'all' and module != 'WCS'">
+                AND A.MODULE=#{module}
+            </if>
+
+            <if test="eqpg == 'all'">
+                AND (A.EQP_G LIKE '%' OR A.EQP_G IS NULL)
+            </if>
+            <if test="eqpg != 'all'">
+                AND A.EQP_G=#{eqpg}
+            </if>
+
+            ORDER BY A.OPER_SEQ
+
+        </if>
+
+    </select>
+
+    <select id="getWipDetailList" resultMap="MstFlowWipDTOMap">
+        <if test="prodg == 'all'">
+            SELECT A.CAST_ID
+            , A.FINAL_PRODG1 AS PRODG1
+            , A.FINAL_PRODSPEC_ID AS PRODSPEC_ID
+            , A.FAB
+            , A.LOCATION_FAB
+            , A.LOT_ID
+            , A.MAINPD_ID
+            , A.OPE_NO
+            , C.EQP_G
+            , 'PATH' AS PATH
+            , A.WAFER_QTY
+            , A.LOT_PRIORITY
+            , CASE WHEN A.SHL_FLAG ='Y' AND A.LOT_PRIORITY>=0 AND A.LOT_PRIORITY &lt;=9 THEN 'Golden'
+            WHEN A.SHL_FLAG ='Y' AND A.LOT_PRIORITY>=10 AND A.LOT_PRIORITY &lt;=39 THEN 'SHL'
+            WHEN A.SHL_FLAG ='Y' AND A.LOT_PRIORITY>=40 AND A.LOT_PRIORITY &lt;=69 THEN 'N_SHL'
+            ELSE '' END AS PRIORITY_TYPE
+            , A.SGS_VALUE AS SGS_EQP
+            , A.SUB_LOT_TYPE
+            , D.FLOWBATCH_ID
+            , D.EQP_ID AS BATCH_FUR
+            , CASE WHEN E.FLOW_BATCH_NAME IS NOT NULL THEN 'Y' ELSE 'N' END AS FLOWBATCH_FLAG
+            , A.EQP_ID
+            , A.XFER_STATE
+            , A.STATE
+            , CASE WHEN A.STATE='RUN' THEN ROUND((SYSDATE -A.CLAIM_TIME)*24,1)
+            WHEN A.STATE='WAIT' THEN ROUND(A.WAIT_TIME,1)
+            WHEN A.STATE='HOLD' THEN ROUND(A.HOLD_TIME,1)
+            WHEN A.STATE='BANK' THEN ROUND(A.BANK_TIME,1)
+            END AS DURATION
+            , A.REMAIN_QTIME
+            , A.TRIGGER_OP_NO
+            , A.TARGET_OP_NO
+            , TO_CHAR(A.TARGET_TIME,'YYYY-MM-DD HH24:MI:SS') AS TARGET_TIME
+            , A.HOLD_COMMENT
+            , A.SAMPLING
+            , A.REMAIN_LAYER
+            FROM A1MFG.PR_WIP_SUM_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.TECH_FLAG ='Y'
+            LEFT JOIN A1MFG.MST_FLOW_PRODG_ALL_FLOW C ON B.PRODG1 = C.PRODG1 AND A.OPE_NO = C.OPER_NO
+            LEFT JOIN A1MFG.PR_FLOWBATCH_LOT D ON A.LOCATION_FAB =D.LOCATION_FAB AND A.LOT_ID =D.LOT_ID
+            LEFT JOIN A1MFG.V_FLOW_BATCH_INFO E ON A.LOCATION_FAB =E.FAB AND A.PRODSPEC_ID =E.PRODSPEC_ID AND A.OPE_NO =E.OPER_NO
+            WHERE 1=1
+            AND A.STATE =#{state}
+            AND A.OPE_NO =#{openo}
+            <include refid="nengCondition"/>
+
+            <include refid="viewCondition"/>
+
+        </if>
+
+        <if test="prodg != 'all'">
+            SELECT A.CAST_ID
+            , A.FINAL_PRODG1 AS PRODG1
+            , A.FINAL_PRODSPEC_ID AS PRODSPEC_ID
+            , A.FAB
+            , A.LOCATION_FAB
+            , A.LOT_ID
+            , A.MAINPD_ID
+            , A.OPE_NO
+            , C.EQP_G
+            , 'PATH' AS PATH
+            , A.WAFER_QTY
+            , A.LOT_PRIORITY
+            , CASE WHEN A.SHL_FLAG ='Y' AND A.LOT_PRIORITY>=0 AND A.LOT_PRIORITY &lt;=9 THEN 'Golden'
+            WHEN A.SHL_FLAG ='Y' AND A.LOT_PRIORITY>=10 AND A.LOT_PRIORITY &lt;=39 THEN 'SHL'
+            WHEN A.SHL_FLAG ='Y' AND A.LOT_PRIORITY>=40 AND A.LOT_PRIORITY &lt;=69 THEN 'N_SHL'
+            ELSE '' END AS PRIORITY_TYPE
+            , A.SGS_VALUE AS SGS_EQP
+            , A.SUB_LOT_TYPE
+            , D.FLOWBATCH_ID
+            , D.EQP_ID AS BATCH_FUR
+            , CASE WHEN E.FLOW_BATCH_NAME IS NOT NULL THEN 'Y' ELSE 'N' END AS FLOWBATCH_FLAG
+            , A.EQP_ID
+            , A.XFER_STATE
+            , A.STATE
+            , CASE WHEN A.STATE='RUN' THEN ROUND((SYSDATE -A.CLAIM_TIME)*24,1)
+            WHEN A.STATE='WAIT' THEN ROUND(A.WAIT_TIME,1)
+            WHEN A.STATE='HOLD' THEN ROUND(A.HOLD_TIME,1)
+            WHEN A.STATE='BANK' THEN ROUND(A.BANK_TIME,1)
+            END AS DURATION
+            , A.REMAIN_QTIME
+            , A.TRIGGER_OP_NO
+            , A.TARGET_OP_NO
+            , TO_CHAR(A.TARGET_TIME,'YYYY-MM-DD HH24:MI:SS') AS TARGET_TIME
+            , A.HOLD_COMMENT
+            , A.SAMPLING
+            , A.REMAIN_LAYER
+            FROM A1MFG.PR_WIP_SUM_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.PRODG1 =#{prodg}
+            LEFT JOIN A1MFG.MST_FLOW_PRODG_ALL_FLOW C ON B.PRODG1 = C.PRODG1 AND A.OPE_NO = C.OPER_NO
+            LEFT JOIN A1MFG.PR_FLOWBATCH_LOT D ON A.LOCATION_FAB =D.LOCATION_FAB AND A.LOT_ID =D.LOT_ID
+            LEFT JOIN A1MFG.V_FLOW_BATCH_INFO E ON A.LOCATION_FAB =E.FAB AND A.PRODSPEC_ID =E.PRODSPEC_ID AND A.OPE_NO =E.OPER_NO
+            WHERE 1=1
+            AND A.STATE =#{state}
+            AND A.OPE_NO =#{openo}
+            <include refid="nengCondition"/>
+
+            <include refid="viewCondition"/>
+
+
+        </if>
+
+    </select>
+
+    <select id="getBackupWipDetailList" resultMap="MstFlowWipDTOMap">
+        <if test="prodg == 'all'">
+            SELECT A.CAST_ID
+            , A.FINAL_PRODG1 AS PRODG1
+            , A.FINAL_PRODSPEC_ID AS PRODSPEC_ID
+            , A.FAB
+            , A.LOCATION_FAB
+            , A.LOT_ID
+            , A.MAINPD_ID
+            , A.OPE_NO
+            , C.EQP_G
+            , 'PATH' AS PATH
+            , A.WAFER_QTY
+            , A.LOT_PRIORITY
+            , CASE WHEN A.SHL_FLAG ='Y' AND A.LOT_PRIORITY>=0 AND A.LOT_PRIORITY &lt;=9 THEN 'Golden'
+            WHEN A.SHL_FLAG ='Y' AND A.LOT_PRIORITY>=10 AND A.LOT_PRIORITY &lt;=39 THEN 'SHL'
+            WHEN A.SHL_FLAG ='Y' AND A.LOT_PRIORITY>=40 AND A.LOT_PRIORITY &lt;=69 THEN 'N_SHL'
+            ELSE '' END AS PRIORITY_TYPE
+            , A.SGS_VALUE AS SGS_EQP
+            , A.SUB_LOT_TYPE
+            , D.FLOWBATCH_ID
+            , D.EQP_ID AS BATCH_FUR
+            , CASE WHEN E.FLOW_BATCH_NAME IS NOT NULL THEN 'Y' ELSE 'N' END AS FLOWBATCH_FLAG
+            , A.EQP_ID
+            , A.XFER_STATE
+            , A.STATE
+            , CASE WHEN A.STATE='RUN' THEN ROUND((SYSDATE -A.CLAIM_TIME)*24,1)
+            WHEN A.STATE='WAIT' THEN ROUND(A.WAIT_TIME,1)
+            WHEN A.STATE='HOLD' THEN ROUND(A.HOLD_TIME,1)
+            WHEN A.STATE='BANK' THEN ROUND(A.BANK_TIME,1)
+            END AS DURATION
+            , A.REMAIN_QTIME
+            , A.TRIGGER_OP_NO
+            , A.TARGET_OP_NO
+            , TO_CHAR(A.TARGET_TIME,'YYYY-MM-DD HH24:MI:SS') AS TARGET_TIME
+            , A.HOLD_COMMENT
+            , A.SAMPLING
+            , A.REMAIN_LAYER
+            FROM A1MFG.PR_WIP_SUM_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.TECH_FLAG ='Y'
+            LEFT JOIN A1MFG.MST_FLOW_PRODG_ALL_FLOW C ON B.PRODG1 = C.PRODG1 AND A.OPE_NO = C.OPER_NO
+            LEFT JOIN A1MFG.PR_FLOWBATCH_LOT D ON A.LOCATION_FAB =D.LOCATION_FAB AND A.LOT_ID =D.LOT_ID
+            LEFT JOIN A1MFG.V_FLOW_BATCH_INFO E ON A.LOCATION_FAB =E.FAB AND A.PRODSPEC_ID =E.PRODSPEC_ID AND A.OPE_NO =E.OPER_NO
+            WHERE 1=1
+            AND A.STATE =#{state}
+            AND A.OPE_NO =#{openo}
+            <include refid="nengCondition"/>
+
+            <if test="view == '12'.toString()">
+                AND A.FAB='N1A1' AND A.LOCATION_FAB='N1A3'
+            </if>
+            <if test="view == '34'.toString()">
+                AND A.FAB='N1A3' AND A.LOCATION_FAB='N1A1'
+            </if>
+            <if test="view != '12'.toString() and view != '34'.toString()">
+                AND A.FAB='N1A1' AND A.LOCATION_FAB='N1A1'
+            </if>
+
+        </if>
+
+        <if test="prodg != 'all'">
+            SELECT A.CAST_ID
+            , A.FINAL_PRODG1 AS PRODG1
+            , A.FINAL_PRODSPEC_ID AS PRODSPEC_ID
+            , A.FAB
+            , A.LOCATION_FAB
+            , A.LOT_ID
+            , A.MAINPD_ID
+            , A.OPE_NO
+            , C.EQP_G
+            , 'PATH' AS PATH
+            , A.WAFER_QTY
+            , A.LOT_PRIORITY
+            , CASE WHEN A.SHL_FLAG ='Y' AND A.LOT_PRIORITY>=0 AND A.LOT_PRIORITY &lt;=9 THEN 'Golden'
+            WHEN A.SHL_FLAG ='Y' AND A.LOT_PRIORITY>=10 AND A.LOT_PRIORITY &lt;=39 THEN 'SHL'
+            WHEN A.SHL_FLAG ='Y' AND A.LOT_PRIORITY>=40 AND A.LOT_PRIORITY &lt;=69 THEN 'N_SHL'
+            ELSE '' END AS PRIORITY_TYPE
+            , A.SGS_VALUE AS SGS_EQP
+            , A.SUB_LOT_TYPE
+            , D.FLOWBATCH_ID
+            , D.EQP_ID AS BATCH_FUR
+            , CASE WHEN E.FLOW_BATCH_NAME IS NOT NULL THEN 'Y' ELSE 'N' END AS FLOWBATCH_FLAG
+            , A.EQP_ID
+            , A.XFER_STATE
+            , A.STATE
+            , CASE WHEN A.STATE='RUN' THEN ROUND((SYSDATE -A.CLAIM_TIME)*24,1)
+            WHEN A.STATE='WAIT' THEN ROUND(A.WAIT_TIME,1)
+            WHEN A.STATE='HOLD' THEN ROUND(A.HOLD_TIME,1)
+            WHEN A.STATE='BANK' THEN ROUND(A.BANK_TIME,1)
+            END AS DURATION
+            , A.REMAIN_QTIME
+            , A.TRIGGER_OP_NO
+            , A.TARGET_OP_NO
+            , TO_CHAR(A.TARGET_TIME,'YYYY-MM-DD HH24:MI:SS') AS TARGET_TIME
+            , A.HOLD_COMMENT
+            , A.SAMPLING
+            , A.REMAIN_LAYER
+            FROM A1MFG.PR_WIP_SUM_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.PRODG1 =#{prodg}
+            LEFT JOIN A1MFG.MST_FLOW_PRODG_ALL_FLOW C ON B.PRODG1 = C.PRODG1 AND A.OPE_NO = C.OPER_NO
+            LEFT JOIN A1MFG.PR_FLOWBATCH_LOT D ON A.LOCATION_FAB =D.LOCATION_FAB AND A.LOT_ID =D.LOT_ID
+            LEFT JOIN A1MFG.V_FLOW_BATCH_INFO E ON A.LOCATION_FAB =E.FAB AND A.PRODSPEC_ID =E.PRODSPEC_ID AND A.OPE_NO =E.OPER_NO
+            WHERE 1=1
+            AND A.STATE =#{state}
+            AND A.OPE_NO =#{openo}
+            <include refid="nengCondition"/>
+
+            <if test="view == '12'.toString()">
+                AND A.FAB='N1A1' AND A.LOCATION_FAB='N1A3'
+            </if>
+            <if test="view == '34'.toString()">
+                AND A.FAB='N1A3' AND A.LOCATION_FAB='N1A1'
+            </if>
+            <if test="view != '12'.toString() and view != '34'.toString()">
+                AND A.FAB='N1A1' AND A.LOCATION_FAB='N1A1'
+            </if>
+
+
+        </if>
+
+    </select>
+
+    <select id="getMoveByProdgList" resultMap="MstFlowMoveByProdgDTOMap">
+
+        <if test="date == 'TD'">
+
+            <if test="prodg == 'all'">
+                SELECT A.SHIFT_DATE
+                , A.FINAL_PRODG1 AS PRODG1
+                , A.MAINPD_ID
+                , A.OPE_NO
+                , SUM(A.WAFER_QTY) AS MOVE
+                , A.LOCATION_FAB
+                , A.FAB
+                FROM A1MFG.PR_MOVE_LIST_TD A
+                JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.TECH_FLAG ='Y'
+                WHERE 1=1
+                AND A.OPE_NO =#{openo}
+                <include refid="nengCondition"/>
+
+                <include refid="viewCondition"/>
+
+                GROUP BY A.SHIFT_DATE, A.LOCATION_FAB, A.FAB, A.FINAL_PRODG1, A.MAINPD_ID, A.OPE_NO
+                ORDER BY A.FINAL_PRODG1, A.MAINPD_ID
+
+            </if>
+
+            <if test="prodg != 'all'">
+                SELECT A.SHIFT_DATE
+                , A.FINAL_PRODG1 AS PRODG1
+                , A.MAINPD_ID
+                , A.OPE_NO
+                , SUM(A.WAFER_QTY) AS MOVE
+                , A.LOCATION_FAB
+                , A.FAB
+                FROM A1MFG.PR_MOVE_LIST_TD A
+                JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.PRODG1 =#{prodg}
+                WHERE 1=1
+                AND A.OPE_NO =#{openo}
+                <include refid="nengCondition"/>
+
+                <include refid="viewCondition"/>
+
+                GROUP BY A.SHIFT_DATE, A.LOCATION_FAB, A.FAB, A.FINAL_PRODG1, A.MAINPD_ID, A.OPE_NO
+                ORDER BY A.FINAL_PRODG1, A.MAINPD_ID
+
+            </if>
+
+        </if>
+
+        <if test="date == 'YD'">
+
+            <if test="prodg == 'all'">
+                SELECT A.SHIFT_DATE
+                , A.FINAL_PRODG1 AS PRODG1
+                , A.MAINPD_ID
+                , A.OPE_NO
+                , SUM(A.WAFER_QTY) AS MOVE
+                , A.LOCATION_FAB
+                , A.FAB
+                FROM A1MFG.PH_MOVE_LIST A
+                JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.TECH_FLAG ='Y'
+                WHERE 1=1
+                AND SHIFT_DATE =TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+                AND A.OPE_NO =#{openo}
+                <include refid="nengCondition"/>
+
+                <include refid="viewCondition"/>
+
+                GROUP BY A.SHIFT_DATE, A.LOCATION_FAB, A.FAB, A.FINAL_PRODG1, A.MAINPD_ID, A.OPE_NO
+                ORDER BY A.FINAL_PRODG1, A.MAINPD_ID
+
+            </if>
+
+            <if test="prodg != 'all'">
+                SELECT A.SHIFT_DATE
+                , A.FINAL_PRODG1 AS PRODG1
+                , A.MAINPD_ID
+                , A.OPE_NO
+                , SUM(A.WAFER_QTY) AS MOVE
+                , A.LOCATION_FAB
+                , A.FAB
+                FROM A1MFG.PH_MOVE_LIST A
+                JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.PRODG1 =#{prodg}
+                WHERE 1=1
+                AND SHIFT_DATE =TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+                AND A.OPE_NO =#{openo}
+                <include refid="nengCondition"/>
+
+                <include refid="viewCondition"/>
+
+                GROUP BY A.SHIFT_DATE, A.LOCATION_FAB, A.FAB, A.FINAL_PRODG1, A.MAINPD_ID, A.OPE_NO
+                ORDER BY A.FINAL_PRODG1, A.MAINPD_ID
+
+            </if>
+
+        </if>
+
+        <if test="date == 'PRE7D'">
+
+            <if test="prodg == 'all'">
+                SELECT A.SHIFT_DATE
+                , A.FINAL_PRODG1 AS PRODG1
+                , A.MAINPD_ID
+                , A.OPE_NO
+                , SUM(A.WAFER_QTY) AS MOVE
+                , A.LOCATION_FAB
+                , A.FAB
+                FROM A1MFG.PH_MOVE_LIST A
+                JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.TECH_FLAG ='Y'
+                WHERE 1=1
+                AND SHIFT_DATE &lt;= TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+                AND SHIFT_DATE >= TO_CHAR(SYSDATE-7.5/24-7,'YYYYMMDD')
+                AND A.OPE_NO =#{openo}
+                <include refid="nengCondition"/>
+
+                <include refid="viewCondition"/>
+
+                GROUP BY A.SHIFT_DATE, A.LOCATION_FAB, A.FAB, A.FINAL_PRODG1, A.MAINPD_ID, A.OPE_NO
+                ORDER BY A.FINAL_PRODG1, A.MAINPD_ID
+
+            </if>
+
+            <if test="prodg != 'all'">
+                SELECT A.SHIFT_DATE
+                , A.FINAL_PRODG1 AS PRODG1
+                , A.MAINPD_ID
+                , A.OPE_NO
+                , SUM(A.WAFER_QTY) AS MOVE
+                , A.LOCATION_FAB
+                , A.FAB
+                FROM A1MFG.PH_MOVE_LIST A
+                JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.PRODG1 =#{prodg}
+                WHERE 1=1
+                AND SHIFT_DATE &lt;= TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+                AND SHIFT_DATE >= TO_CHAR(SYSDATE-7.5/24-7,'YYYYMMDD')
+                AND A.OPE_NO =#{openo}
+                <include refid="nengCondition"/>
+
+                <include refid="viewCondition"/>
+
+                GROUP BY A.SHIFT_DATE, A.LOCATION_FAB, A.FAB, A.FINAL_PRODG1, A.MAINPD_ID, A.OPE_NO
+                ORDER BY A.FINAL_PRODG1, A.MAINPD_ID
+
+            </if>
+
+        </if>
+
+    </select>
+
+    <select id="getMoveByEqpgList" resultMap="MstFlowMoveByEqpgDTOMap">
+
+        <if test="date == 'TD'">
+
+            <if test="prodg == 'all'">
+                SELECT A.SHIFT_DATE
+                , A.EQP_ID
+                , A.FINAL_PRODG1 AS PRODG1
+                , A.MAINPD_ID
+                , A.OPE_NO
+                , SUM(A.WAFER_QTY) AS MOVE
+                , A.LOCATION_FAB
+                , A.FAB
+                FROM A1MFG.PR_MOVE_LIST_TD A
+                JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.TECH_FLAG ='Y'
+                WHERE 1=1
+                AND A.OPE_NO =#{openo}
+                <include refid="nengCondition"/>
+
+                <include refid="viewCondition"/>
+
+                GROUP BY A.SHIFT_DATE, A.LOCATION_FAB, A.FAB, A.FINAL_PRODG1, A.MAINPD_ID, A.OPE_NO, A.EQP_ID
+                ORDER BY A.EQP_ID, A.FINAL_PRODG1, A.MAINPD_ID
+
+            </if>
+
+            <if test="prodg != 'all'">
+                SELECT A.SHIFT_DATE
+                , A.EQP_ID
+                , A.FINAL_PRODG1 AS PRODG1
+                , A.MAINPD_ID
+                , A.OPE_NO
+                , SUM(A.WAFER_QTY) AS MOVE
+                , A.LOCATION_FAB
+                , A.FAB
+                FROM A1MFG.PR_MOVE_LIST_TD A
+                JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.PRODG1 =#{prodg}
+                WHERE 1=1
+                AND A.OPE_NO =#{openo}
+                <include refid="nengCondition"/>
+
+                <include refid="viewCondition"/>
+
+                GROUP BY A.SHIFT_DATE, A.LOCATION_FAB, A.FAB, A.FINAL_PRODG1, A.MAINPD_ID, A.OPE_NO, A.EQP_ID
+                ORDER BY A.EQP_ID, A.FINAL_PRODG1, A.MAINPD_ID
+
+            </if>
+
+        </if>
+
+        <if test="date == 'YD'">
+
+            <if test="prodg == 'all'">
+                SELECT A.SHIFT_DATE
+                , A.EQP_ID
+                , A.FINAL_PRODG1 AS PRODG1
+                , A.MAINPD_ID
+                , A.OPE_NO
+                , SUM(A.WAFER_QTY) AS MOVE
+                , A.LOCATION_FAB
+                , A.FAB
+                FROM A1MFG.PH_MOVE_LIST A
+                JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.TECH_FLAG ='Y'
+                WHERE 1=1
+                AND SHIFT_DATE =TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+                AND A.OPE_NO =#{openo}
+                <include refid="nengCondition"/>
+
+                <include refid="viewCondition"/>
+
+                GROUP BY A.SHIFT_DATE, A.LOCATION_FAB, A.FAB, A.FINAL_PRODG1, A.MAINPD_ID, A.OPE_NO, A.EQP_ID
+                ORDER BY A.EQP_ID, A.FINAL_PRODG1, A.MAINPD_ID
+
+            </if>
+
+            <if test="prodg != 'all'">
+                SELECT A.SHIFT_DATE
+                , A.EQP_ID
+                , A.FINAL_PRODG1 AS PRODG1
+                , A.MAINPD_ID
+                , A.OPE_NO
+                , SUM(A.WAFER_QTY) AS MOVE
+                , A.LOCATION_FAB
+                , A.FAB
+                FROM A1MFG.PH_MOVE_LIST A
+                JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.PRODG1 =#{prodg}
+                WHERE 1=1
+                AND SHIFT_DATE =TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+                AND A.OPE_NO =#{openo}
+                <include refid="nengCondition"/>
+
+                <include refid="viewCondition"/>
+
+                GROUP BY A.SHIFT_DATE, A.LOCATION_FAB, A.FAB, A.FINAL_PRODG1, A.MAINPD_ID, A.OPE_NO, A.EQP_ID
+                ORDER BY A.EQP_ID, A.FINAL_PRODG1, A.MAINPD_ID
+
+            </if>
+
+        </if>
+
+        <if test="date == 'PRE7D'">
+
+            <if test="prodg == 'all'">
+                SELECT A.SHIFT_DATE
+                , A.EQP_ID
+                , A.FINAL_PRODG1 AS PRODG1
+                , A.MAINPD_ID
+                , A.OPE_NO
+                , SUM(A.WAFER_QTY) AS MOVE
+                , A.LOCATION_FAB
+                , A.FAB
+                FROM A1MFG.PH_MOVE_LIST A
+                JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.TECH_FLAG ='Y'
+                WHERE 1=1
+                AND SHIFT_DATE &lt;= TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+                AND SHIFT_DATE >= TO_CHAR(SYSDATE-7.5/24-7,'YYYYMMDD')
+                AND A.OPE_NO =#{openo}
+                <include refid="nengCondition"/>
+
+                <include refid="viewCondition"/>
+
+                GROUP BY A.SHIFT_DATE, A.LOCATION_FAB, A.FAB, A.FINAL_PRODG1, A.MAINPD_ID, A.OPE_NO, A.EQP_ID
+                ORDER BY A.EQP_ID, A.FINAL_PRODG1, A.MAINPD_ID
+
+            </if>
+
+            <if test="prodg != 'all'">
+                SELECT A.SHIFT_DATE
+                , A.EQP_ID
+                , A.FINAL_PRODG1 AS PRODG1
+                , A.MAINPD_ID
+                , A.OPE_NO
+                , SUM(A.WAFER_QTY) AS MOVE
+                , A.LOCATION_FAB
+                , A.FAB
+                FROM A1MFG.PH_MOVE_LIST A
+                JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.PRODG1 =#{prodg}
+                WHERE 1=1
+                AND SHIFT_DATE &lt;= TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+                AND SHIFT_DATE >= TO_CHAR(SYSDATE-7.5/24-7,'YYYYMMDD')
+                AND A.OPE_NO =#{openo}
+                <include refid="nengCondition"/>
+
+                <include refid="viewCondition"/>
+
+                GROUP BY A.SHIFT_DATE, A.LOCATION_FAB, A.FAB, A.FINAL_PRODG1, A.MAINPD_ID, A.OPE_NO, A.EQP_ID
+                ORDER BY A.EQP_ID, A.FINAL_PRODG1, A.MAINPD_ID
+
+            </if>
+
+        </if>
+
+    </select>
+
+    <select id="getLotOpeHSList" resultMap="MstFlowLotOpeDTOMap">
+        WITH OPEHS_DATA AS (
+        SELECT 'N1A1' AS LOCATION_FAB
+        , CASE WHEN A.OPE_CATEGORY='OperationComplete' THEN A.PREV_MAINPD_ID ELSE A.MAINPD_ID END AS MAINPD_ID
+        , CASE WHEN A.OPE_CATEGORY='OperationComplete' THEN PREV_OPE_NO ELSE OPE_NO END AS OPE_NO
+        , A.CLAIM_TIME
+        , A.CLAIM_USER_ID
+        , A.OPE_CATEGORY
+        , CASE WHEN A.EQP_ID IS NULL THEN ' ' ELSE A.EQP_ID END AS EQP_ID
+        , A.CLAIM_MEMO
+        , A.OPE_MODE
+        , A.HOLD_USER_ID
+        , A.HOLD_REASON_CODE AS REASON_CODE
+        , A.FLOWBATCH_ID
+        FROM ODS.WPFAB1_FHOPEHS A
+        WHERE A.LOT_ID =#{lotid}
+        AND A.PRODSPEC_ID =#{prodspecid}
+        UNION ALL
+        SELECT 'N1A3' AS LOCATION_FAB
+        , CASE WHEN A.OPE_CATEGORY='OperationComplete' THEN A.PREV_MAINPD_ID ELSE A.MAINPD_ID END AS MAINPD_ID
+        , CASE WHEN A.OPE_CATEGORY='OperationComplete' THEN PREV_OPE_NO ELSE OPE_NO END AS OPE_NO
+        , A.CLAIM_TIME
+        , A.CLAIM_USER_ID
+        , A.OPE_CATEGORY
+        , CASE WHEN A.EQP_ID IS NULL THEN ' ' ELSE A.EQP_ID END AS EQP_ID
+        , A.CLAIM_MEMO
+        , A.OPE_MODE
+        , A.HOLD_USER_ID
+        , A.HOLD_REASON_CODE AS REASON_CODE
+        , A.FLOWBATCH_ID
+        FROM A1MFG.WPFAB1_FHOPEHS_A3 A
+        WHERE A.LOT_ID =#{lotid}
+        AND A.PRODSPEC_ID =#{prodspecid}
+        )
+        SELECT A.LOCATION_FAB
+        , A.MAINPD_ID
+        , A.OPE_NO
+        , TO_CHAR(A.CLAIM_TIME,'YYYY-MM-DD HH24:MI:SS') AS CLAIM_TIME
+        , A.CLAIM_USER_ID
+        , A.OPE_CATEGORY
+        , A.EQP_ID
+        , A.CLAIM_MEMO
+        , A.OPE_MODE
+        , A.HOLD_USER_ID
+        , A.REASON_CODE
+        , A.FLOWBATCH_ID
+        FROM OPEHS_DATA A
+        ORDER BY A.CLAIM_TIME
+    </select>
+
+    <select id="getQtimeDetailList" resultMap="MstFlowQtimeDTOMap">
+        SELECT DISTINCT A.CUSTOMER
+        , A.CUSTOMER2 AS CT_G
+        , A.FINAL_PRODG1 AS PRODG1
+        , A.FINAL_PRODSPEC_ID AS PRODSPEC_ID
+        , A.FLOW_KEY
+        , A.FROM_OPE_NO
+        , A.TO_OPE_NO
+        , (A.TO_SEQ -A.FROM_SEQ) AS QTIME_STEP
+        , A.QTIME_LIMIT
+        FROM A1MFG.FLOW_QTIME_CONSTRAINT_ALL A
+        WHERE 1=1
+        <if test="prodg == 'all'">
+            AND A.FINAL_PRODG1 =#{tech}
+        </if>
+        <if test="prodg != 'all'">
+            AND A.FINAL_PRODG1 =#{prodg}
+        </if>
+
+        AND A.FROM_OPE_NO =#{openo}
+
+    </select>
+
+    <select id="getSamplingRateDetailList" resultMap="MstFlowSamplingDTOMap">
+        SELECT DISTINCT A.CUSTOMER
+        , A.CUSTOMER2 AS CT_G
+        , A.FINAL_PRODG1 AS PRODG1
+        , A.PRODSPEC_ID
+        , A.MODULE
+        , A.OPE_NO
+        , CASE WHEN A.MAINCHIP=1 THEN '★' END AS MAIN_SUFFIX
+        , CASE WHEN A.SAMPLING_RATE IS NOT NULL THEN A.SAMPLING_RATE*100 || '%' END AS SAMPLING_RATE
+        FROM A1MFG.V_FLOW_SAMPLING_RATE_ALL A
+        WHERE 1=1
+        AND A.OPE_NO =#{openo}
+        <if test="prodg == 'all'">
+            AND A.FINAL_PRODG1 =#{tech}
+        </if>
+        <if test="prodg != 'all'">
+            AND A.FINAL_PRODG1 =#{prodg}
+        </if>
+        ORDER BY A.PRODSPEC_ID
+
+    </select>
+
+    <select id="getpathDetailList" resultMap="MstFlowPathDTOMap">
+        SELECT 'N1A1' AS LOCATION_FAB
+        , #{prodg} AS PRODG1
+        , PRODUCTID AS PRODSPEC_ID
+        , ROUTEID AS ROUTE
+        , OPENO AS OPE_NO
+        , EQUIPMENTID AS EQP_ID
+        , PASS_FLG_PRC AS PROC_USE_FLAG
+        , PRC_UPT_USER AS PROC_UPT_USER
+        , TO_CHAR(TO_TIMESTAMP(TRIM(PRC_UPT_TIME), 'YYYY-MM-DD-HH24.MI.SS.FF'),'YYYY-MM-DD HH24:MI:SS') AS PROC_UPT_TIME
+        , PASS_FLG_MFG AS MFG_USE_FLAG
+        , MFG_UPT_USER
+        , TO_CHAR(TO_TIMESTAMP(TRIM(MFG_UPT_TIME), 'YYYY-MM-DD-HH24.MI.SS.FF'),'YYYY-MM-DD HH24:MI:SS') AS MFG_UPT_TIME
+        FROM MM.CSFRINHIBIT c
+        WHERE 1=1
+        AND PASS_FLG_PRC='Y'
+        AND OPENO =#{openo}
+        AND PRODUCTID =#{prodspecid}
+        AND ROUTEID =SUBSTR(#{mainpdid}, 1, INSTR(#{mainpdid}, '.') - 1)
+        UNION ALL
+        SELECT 'N1A3' AS LOCATION_FAB
+        , #{prodg} AS PRODG1
+        , PRODUCTID AS PRODSPEC_ID
+        , ROUTEID AS ROUTE
+        , OPENO AS OPE_NO
+        , EQUIPMENTID AS EQP_ID
+        , PASS_FLG_PRC AS PROC_USE_FLAG
+        , PRC_UPT_USER AS PROC_UPT_USER
+        , TO_CHAR(TO_TIMESTAMP(TRIM(PRC_UPT_TIME), 'YYYY-MM-DD-HH24.MI.SS.FF'),'YYYY-MM-DD HH24:MI:SS') AS PROC_UPT_TIME
+        , PASS_FLG_MFG AS MFG_USE_FLAG
+        , MFG_UPT_USER
+        , TO_CHAR(TO_TIMESTAMP(TRIM(MFG_UPT_TIME), 'YYYY-MM-DD-HH24.MI.SS.FF'),'YYYY-MM-DD HH24:MI:SS') AS MFG_UPT_TIME
+        FROM PWEB.CSFRINHIBIT_A3
+        WHERE 1=1
+        AND PASS_FLG_PRC='Y'
+        AND OPENO =#{openo}
+        AND PRODUCTID =#{prodspecid}
+        AND ROUTEID =SUBSTR(#{mainpdid}, 1, INSTR(#{mainpdid}, '.') - 1)
+
+    </select>
+
+    <select id="getDybLotDetailList" resultMap="MstFlowDybDTOMap">
+        <if test="prodg == 'all'">
+            SELECT A.FAB
+            , A.LOCATION_FAB
+            , A.FINAL_PRODG1 AS PRODG1
+            , A.LOT_ID
+            , A.MAINPD_ID
+            , A.OPE_NO
+            , A.NEXT_OPE_NO AS PREV_OPE_NO
+            , A.WAFER_QTY
+            FROM A1MFG.PR_WIP_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.TECH_FLAG ='Y'
+            WHERE 1=1
+            AND A.WIP_FLAG ='DYB'
+            AND A.MAINPD_ID LIKE 'DYB%'
+            <include refid="viewCondition"/>
+            ORDER BY A.FAB , A.LOCATION_FAB
+
+        </if>
+
+        <if test="prodg != 'all'">
+            SELECT A.FAB
+            , A.LOCATION_FAB
+            , A.FINAL_PRODG1 AS PRODG1
+            , A.LOT_ID
+            , A.MAINPD_ID
+            , A.OPE_NO
+            , A.NEXT_OPE_NO AS PREV_OPE_NO
+            , A.WAFER_QTY
+            FROM A1MFG.PR_WIP_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.PRODG1 =#{prodg}
+            WHERE 1=1
+            AND A.WIP_FLAG ='DYB'
+            AND A.MAINPD_ID LIKE 'DYB%'
+            <include refid="viewCondition"/>
+            ORDER BY A.FAB , A.LOCATION_FAB
+
+        </if>
+
+    </select>
+
+    <select id="getSgsEqpList" resultMap="MstFlowSgsDTOMap">
+        <if test="prodg == 'all'">
+            SELECT B.TECH AS PRODG1, A.OPE_NO, A.SGS_EQP, SUM(A.WAFER_QTY) AS SGS_WIP
+            FROM A1MFG.PR_WIP_SUM_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.TECH_FLAG ='Y'
+            WHERE 1=1
+            AND A.SGS_VALUE IS NOT NULL
+            AND OPE_NO =#{openo}
+            <include refid="nengCondition"/>
+
+            <include refid="viewCondition"/>
+
+            GROUP BY B.TECH, A.OPE_NO, A.SGS_EQP
+            ORDER BY LENGTH(A.SGS_EQP), A.SGS_EQP
+
+        </if>
+
+        <if test="prodg != 'all'">
+            SELECT A.FINAL_PRODG1 AS PRODG1, A.OPE_NO, A.SGS_EQP, SUM(A.WAFER_QTY) AS SGS_WIP
+            FROM A1MFG.PR_WIP_SUM_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.PRODG1 =#{prodg}
+            WHERE 1=1
+            AND A.SGS_VALUE IS NOT NULL
+            AND OPE_NO =#{openo}
+            <include refid="nengCondition"/>
+
+            <include refid="viewCondition"/>
+
+            GROUP BY A.FINAL_PRODG1, A.OPE_NO, A.SGS_EQP
+            ORDER BY LENGTH(A.SGS_EQP), A.SGS_EQP
+
+        </if>
+
+    </select>
+
+    <select id="getSgsWipDetailList" resultMap="MstFlowWipDTOMap">
+        <if test="prodg == 'all'">
+            SELECT A.CAST_ID
+            , A.FINAL_PRODG1 AS PRODG1
+            , A.FINAL_PRODSPEC_ID AS PRODSPEC_ID
+            , A.FAB
+            , A.LOCATION_FAB
+            , A.LOT_ID
+            , A.MAINPD_ID
+            , A.OPE_NO
+            , C.EQP_G
+            , 'PATH' AS PATH
+            , A.WAFER_QTY
+            , A.LOT_PRIORITY
+            , A.SGS_VALUE AS SGS_EQP
+            , A.SUB_LOT_TYPE
+            , A.EQP_ID
+            , A.XFER_STATE
+            , A.STATE
+            , CASE WHEN A.STATE='RUN' THEN ROUND((SYSDATE -A.CLAIM_TIME)*24,1)
+            WHEN A.STATE='WAIT' THEN ROUND(A.WAIT_TIME,1)
+            WHEN A.STATE='HOLD' THEN ROUND(A.HOLD_TIME,1)
+            WHEN A.STATE='BANK' THEN ROUND(A.BANK_TIME,1)
+            END AS DURATION
+            , A.REMAIN_QTIME
+            , A.TRIGGER_OP_NO
+            , A.TARGET_OP_NO
+            , TO_CHAR(A.TARGET_TIME,'YYYY-MM-DD HH24:MI:SS') AS TARGET_TIME
+            , A.HOLD_COMMENT
+            , A.SAMPLING
+            , A.REMAIN_LAYER
+            FROM A1MFG.PR_WIP_SUM_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.TECH_FLAG ='Y'
+            LEFT JOIN A1MFG.MST_FLOW_PRODG_ALL_FLOW C ON B.PRODG1 = C.PRODG1 AND A.OPE_NO = C.OPER_NO
+            WHERE 1=1
+            AND A.OPE_NO =#{openo}
+            AND A.SGS_EQP =#{sgseqp}
+            <include refid="nengCondition"/>
+
+            <include refid="viewCondition"/>
+
+        </if>
+
+        <if test="prodg != 'all'">
+            SELECT A.CAST_ID
+            , A.FINAL_PRODG1 AS PRODG1
+            , A.FINAL_PRODSPEC_ID AS PRODSPEC_ID
+            , A.FAB
+            , A.LOCATION_FAB
+            , A.LOT_ID
+            , A.MAINPD_ID
+            , A.OPE_NO
+            , C.EQP_G
+            , 'PATH' AS PATH
+            , A.WAFER_QTY
+            , A.LOT_PRIORITY
+            , A.SGS_VALUE AS SGS_EQP
+            , A.SUB_LOT_TYPE
+            , A.EQP_ID
+            , A.XFER_STATE
+            , A.STATE
+            , CASE WHEN A.STATE='RUN' THEN ROUND((SYSDATE -A.CLAIM_TIME)*24,1)
+            WHEN A.STATE='WAIT' THEN ROUND(A.WAIT_TIME,1)
+            WHEN A.STATE='HOLD' THEN ROUND(A.HOLD_TIME,1)
+            WHEN A.STATE='BANK' THEN ROUND(A.BANK_TIME,1)
+            END AS DURATION
+            , A.REMAIN_QTIME
+            , A.TRIGGER_OP_NO
+            , A.TARGET_OP_NO
+            , TO_CHAR(A.TARGET_TIME,'YYYY-MM-DD HH24:MI:SS') AS TARGET_TIME
+            , A.HOLD_COMMENT
+            , A.SAMPLING
+            , A.REMAIN_LAYER
+            FROM A1MFG.PR_WIP_SUM_LIST A
+            JOIN A1MFG.PRODUCT_TECH_COMBINE B ON A.FINAL_PRODG1 = B.PRODG1 AND B.TECH =#{tech} AND B.PRODG1 =#{prodg}
+            LEFT JOIN A1MFG.MST_FLOW_PRODG_ALL_FLOW C ON B.PRODG1 = C.PRODG1 AND A.OPE_NO = C.OPER_NO
+            WHERE 1=1
+            AND A.OPE_NO =#{openo}
+            AND A.SGS_EQP =#{sgseqp}
+            <include refid="nengCondition"/>
+
+            <include refid="viewCondition"/>
+
+
+        </if>
+
+    </select>
+
+    <select id="getTechList" resultType="java.util.Map">
+        SELECT A.TECH_LABEL, A.TECH_VALUE
+        FROM(
+        SELECT DISTINCT A.TECH AS TECH_LABEL, NVL(B.TECH_TEXT,A.TECH) AS TECH_VALUE, B.SEQ_NO
+        FROM A1MFG.PRODUCT_TECH_COMBINE A
+        LEFT JOIN A1MFG.MSTFLOW_TECH_MAINTAIN B ON A.TECH =B.TECH_TEXT
+        )A
+        ORDER BY A.SEQ_NO, A.TECH_VALUE
+    </select>
+
+    <select id="getProdgList" resultType="java.util.Map">
+        SELECT PRODG1_LABEL, PRODG1_VALUE
+        FROM (
+        SELECT 'ALL' PRODG1_LABEL, 'all' PRODG1_VALUE FROM DUAL
+        UNION ALL
+        SELECT DISTINCT PRODG1 AS PRODG1_LABEL, PRODG1 AS PRODG1_VALUE
+        FROM A1MFG.PRODUCT_TECH_COMBINE
+        WHERE PRODG1 IS NOT NULL
+        AND TECH =#{tech}
+        )
+        ORDER BY PRODG1_LABEL
+
+    </select>
+
+    <select id="getEqpgList" resultType="java.util.Map">
+        <if test="prodg == 'all'">
+            SELECT DISTINCT A.EQPG_LABEL, A.EQPG_VALUE FROM (
+            SELECT 'ALL' EQPG_LABEL, 'all' EQPG_VALUE , '' AS MODULE FROM DUAL
+            UNION ALL
+            SELECT DISTINCT EQP_G AS EQPG_LABEL, EQP_G AS EQPG_VALUE , MODULE
+            FROM A1MFG.TECH_FLOW_MAINTAIN
+            WHERE EQP_G IS NOT NULL
+            AND TECH =#{tech}
+
+            <if test="module == 'all'">
+                AND (MODULE LIKE '%' OR MODULE IS NULL)
+            </if>
+            <if test="module == 'WCS'">
+                AND MODULE IN ('WET','CMP')
+            </if>
+            <if test="module != 'all' and module != 'WCS'">
+                AND MODULE=#{module}
+            </if>
+
+            )A
+
+            ORDER BY A.EQPG_LABEL
+
+        </if>
+
+        <if test="prodg != 'all'">
+            SELECT DISTINCT A.EQPG_LABEL, A.EQPG_VALUE FROM (
+            SELECT 'ALL' EQPG_LABEL, 'all' EQPG_VALUE , '' AS MODULE FROM DUAL
+            UNION ALL
+            SELECT DISTINCT EQP_G AS EQPG_LABEL, EQP_G AS EQPG_VALUE , MODULE
+            FROM A1MFG.MST_FLOW_PRODG_ALL_FLOW
+            WHERE EQP_G IS NOT NULL
+            AND PRODG1 =#{prodg}
+
+            <if test="module == 'all'">
+                AND (MODULE LIKE '%' OR MODULE IS NULL)
+            </if>
+            <if test="module == 'WCS'">
+                AND MODULE IN ('WET','CMP')
+            </if>
+            <if test="module != 'all' and module != 'WCS'">
+                AND MODULE=#{module}
+            </if>
+
+            )A
+
+            ORDER BY A.EQPG_LABEL
+
+        </if>
+
+    </select>
+
+
+</mapper>

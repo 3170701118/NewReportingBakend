@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.PermissionMapper">
+
+    <resultMap id="searchTable" type="mfg.reporting.dto.MFGPermissionTableDTO">
+        <id column="FUNCTION_ID" property="functionId"/>
+        <result column="ACTIVE_FLAG" property="activeFlag"/>
+        <result column="REMARK" property="remark"/>
+        <result column="EMAILS" property="emails"/>
+        <result column="CNAMES" property="cnames"/>
+        <result column="SDEPT_ID" property="sdeptId"/>
+        <result column="SDEPT_CNAME" property="sdeptCname"/>
+        <result column="DEPT_ID" property="deptId"/>
+        <result column="DEPT_CNAME" property="deptCname"/>
+        <result column="POWER" property="power"/>
+        <result column="POWER_CNAME" property="powerCname"/>
+        <result column="MENU_NAME" property="menuName"/>
+        <result column="MENU_ID" property="menuId"/>
+    </resultMap>
+
+
+    <select id="searchTableList" resultMap="searchTable">
+        SELECT
+        D.*,F.MENU_NAME,F.MENU_ID
+        FROM(
+        SELECT
+        FUNCTION_ID,ACTIVE_FLAG,MAX(REMARK)REMARK
+        ,MAX(EMAILS) EMAILS,MAX(CNAMES)CNAMES
+        ,MAX(SDEPT_ID)SDEPT_ID,MAX(SDEPT_CNAME)SDEPT_CNAME
+        ,MAX(DEPT_ID)DEPT_ID,MAX(DEPT_CNAME)DEPT_CNAME
+        ,MAX(POWER)POWER,MAX(POWER_CNAME)POWER_CNAME
+        FROM(
+        SELECT
+        FUNCTION_ID,ACTIVE_FLAG, TYPE_,SHOW_,ACT_,REMARK
+        ,CASE WHEN TYPE_ = 'CNAME' THEN SHOW_ END EMAILS
+        ,CASE WHEN TYPE_ = 'CNAME' THEN ACT_ END CNAMES
+        ,CASE WHEN TYPE_ = 'SDEPT' THEN SHOW_ END SDEPT_ID
+        ,CASE WHEN TYPE_ = 'SDEPT' THEN ACT_ END SDEPT_CNAME
+        ,CASE WHEN TYPE_ = 'DEPT' THEN SHOW_ END DEPT_ID
+        ,CASE WHEN TYPE_ = 'DEPT' THEN ACT_ END DEPT_CNAME
+        ,CASE WHEN TYPE_ = 'POWER' THEN SHOW_ END POWER_CNAME
+        ,CASE WHEN TYPE_ = 'POWER' THEN ACT_ END POWER
+        FROM(
+        --生效的场景：
+        --0.管理员权限 Reporting，
+        --1.全部权限，2.个人权限，3.课权限，4.部门权限,5.指定cnames和SDEPT，6.指定cnames和DEPT，7.指定SDEPT和DEPT
+        --，8.指定cnames、SDEPT和DEPT,9.指定部门且职位（power）
+        SELECT
+        FUNCTION_ID,ACTIVE_FLAG ,'CNAME' TYPE_,REMARK
+        ,CASE WHEN ACTIVE_FLAG=0 THEN ''
+        WHEN ACTIVE_FLAG=1 THEN '' END SHOW_
+        ,CASE WHEN ACTIVE_FLAG=0 THEN 'Reporting'
+        WHEN ACTIVE_FLAG=1 THEN 'All' END ACT_
+        FROM A1MFG.SYS_PERMISSION_MANAGE
+        WHERE ACTIVE_FLAG IN (0,1)
+        UNION ALL
+        --个人
+        SELECT
+        FUNCTION_ID,ACTIVE_FLAG,'CNAME' TYPE_,MAX(REMARK)REMARK
+        ,CNAMES SHOW_,LISTAGG(CNAME,';')WITHIN GROUP(ORDER BY ORDER_)ACT_
+        FROM(
+        SELECT FUNCTION_ID,ACTIVE_FLAG,CNAMES,CNAME,EMAIL,REMARK,INSTR(CNAMES,EMAIL)ORDER_
+        FROM(
+        SELECT
+        FUNCTION_ID,ACTIVE_FLAG,CNAMES,REMARK
+        FROM A1MFG.SYS_PERMISSION_MANAGE
+        WHERE ACTIVE_FLAG IN (2,5,6,8)
+        )A LEFT JOIN
+        WORKFLOW.HR_USERS B
+        ON INSTR(';'|| A.CNAMES ||';' ,';'||B.EMAIL||';')>0
+        )GROUP BY FUNCTION_ID,ACTIVE_FLAG,CNAMES
+        UNION ALL
+        --SDEPT
+        SELECT
+        FUNCTION_ID,ACTIVE_FLAG,'SDEPT' TYPE_,REMARK
+        ,SDEPT SHOW_, SDEPT ACT
+        FROM A1MFG.SYS_PERMISSION_MANAGE
+        WHERE ACTIVE_FLAG IN (3,5,7,8)
+        UNION ALL
+        --DEPT
+        SELECT
+        FUNCTION_ID,ACTIVE_FLAG,'DEPT' TYPE_,MAX(REMARK)REMARK
+        ,DEPT SHOW_,LISTAGG(DEPT_CNAME,';')WITHIN GROUP(ORDER BY ORDER_)ACT_
+        FROM(
+        SELECT
+        A.*,B.DEPT_CNAME,B.DEPT_ID,INSTR(DEPT,B.DEPT_ID)ORDER_
+        FROM(
+        SELECT
+        FUNCTION_ID,ACTIVE_FLAG,DEPT,REMARK
+        FROM A1MFG.SYS_PERMISSION_MANAGE
+        WHERE ACTIVE_FLAG IN (4,6,7,8,9)
+        )A LEFT JOIN
+        (
+        SELECT DISTINCT  DEPT_ID,DEPT_CNAME FROM WORKFLOW.HR_USERS
+        WHERE EMAIL IS NOT NULL AND QUIT_DATE IS NULL AND BYWORK = '0'
+        )B
+        ON INSTR(';'||A.DEPT||';',';'||B.DEPT_ID||';')>0
+        )GROUP BY FUNCTION_ID,ACTIVE_FLAG,DEPT
+        UNION ALL
+        SELECT
+        FUNCTION_ID,ACTIVE_FLAG,'POWER' TYPE_,REMARK
+        ,CASE WHEN POWER = 500 THEN '副理'
+        WHEN POWER = 400 THEN '部经理' END SHOW_
+        ,TO_CHAR(POWER) ACT_
+        FROM A1MFG.SYS_PERMISSION_MANAGE
+        WHERE ACTIVE_FLAG = 9
+        ))GROUP BY FUNCTION_ID,ACTIVE_FLAG
+        ) D LEFT JOIN
+        A1MFG.SYS_FUNCTION_LIST E
+        ON D.FUNCTION_ID = E.FUNCTION_ID
+        LEFT JOIN A1MFG.SYS_MENU_LIST F
+        ON E.MENU_ID= F.ROUTE_NAME
+        WHERE 1=1
+        <if test="menuName!= null and menuName!= ''">
+            AND  F.ROUTE_NAME =  #{menuName}
+        </if>
+        <if test="functionId!= null and functionId!= ''">
+            AND  D.FUNCTION_ID LIKE CONCAT('%',CONCAT(#{functionId},'%'))
+        </if>
+    </select>
+
+    <insert id="insertPermissionItem" parameterType="mfg.reporting.pojo.MFGPermission">
+        INSERT INTO A1MFG.SYS_PERMISSION_MANAGE(FUNCTION_ID,CNAMES,SDEPT,DEPT,POWER,ACTIVE_FLAG,REMARK,UPDATE_TIME,UPDATE_USER)
+        VALUES(#{functionId},#{cnames,jdbcType=VARCHAR},#{sdept,jdbcType=VARCHAR},#{dept,jdbcType=VARCHAR},#{power},#{activeFlag},#{remark,jdbcType=VARCHAR},SYSDATE,#{updateUser})
+    </insert>
+
+    <update id="updatePermissionItem" parameterType="mfg.reporting.pojo.MFGPermission">
+        UPDATE A1MFG.SYS_PERMISSION_MANAGE
+        SET CNAMES = #{cnames,jdbcType=VARCHAR}
+        ,SDEPT = #{sdept,jdbcType=VARCHAR}
+        ,DEPT = #{dept,jdbcType=VARCHAR}
+        ,POWER = #{power,jdbcType=INTEGER}
+        ,ACTIVE_FLAG = #{activeFlag}
+        ,REMARK = #{remark,jdbcType=VARCHAR}
+        ,UPDATE_TIME = SYSDATE
+        ,UPDATE_USER = #{updateUser}
+        WHERE FUNCTION_ID = #{functionId}
+    </update>
+
+    <delete id="deletePermissionItem">
+        DELETE FROM A1MFG.SYS_PERMISSION_MANAGE WHERE FUNCTION_ID = #{functionId}
+    </delete>
+</mapper>

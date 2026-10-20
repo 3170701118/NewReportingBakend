@@ -1,0 +1,543 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.HoldLotToSubDeptMapper">
+
+    <resultMap id="HoldLotToSubDeptMap" type="mfg.reporting.pojo.HoldLotToSubDeptPO">
+        <id column="PRODG1" property="prodG1" />
+        <id column="CHIP_BODY" property="chipBody" />
+        <id column="PRODSPEC_ID" property="prodSpecId" />
+        <id column="MAINPD_ID" property="mainPdId" />
+        <id column="ROUTEID" property="routeId" />
+        <id column="FAB" property="fab" />
+        <id column="LOT_ID" property="lotId" />
+        <id column="LOCATION" property="location" />
+        <id column="LOT_MFG_MODULE" property="lotMfgModule" />
+        <id column="LOT_ID_REAL" property="lotIdReal" />
+        <id column="OPE_NO" property="opeNo" />
+        <id column="PRODUCT_OWNER_EMPID" property="productOwnerEmpId" />
+        <id column="PRODUCT_OWNER_SUB_DEPT_ID" property="productOwnerSubDeptId"/>
+        <id column="PRODUCT_OWNER_SUB_DEPT_CNAME" property="productOwnerSubDeptCname"/>
+        <id column="MODULE_OWNER" property="moduleOwner" />
+        <id column="TECH" property="tech" />
+        <id column="EQP_G" property="eqpG" />
+        <id column="RULE" property="rule" />
+        <id column="SDEPT_ID" property="sdeptId" />
+        <id column="SDEPT_CNAME" property="sdeptCname" />
+        <id column="OPER_NO_REAL" property="operNoReal" />
+    </resultMap>
+
+    <resultMap id="HoldLotToSubDeptRuleMap" type="mfg.reporting.pojo.HoldLotToSubDeptRulePO">
+        <id column="EQP_G" property="eqpG" />
+        <id column="MODULE_OWNER" property="moduleOwner" />
+        <id column="MODULE" property="module" />
+        <id column="OPE_NO" property="opeNo" />
+        <id column="RULE" property="rule" />
+        <id column="RULE_DESC" property="ruleDesc" />
+        <id column="SDEPT_CNAME" property="sdeptCname"/>
+        <id column="SDEPT_ID" property="sdeptId" />
+        <id column="UPDATE_FLAG" property="updateFlag" />
+        <id column="LOCATION" property="location" />
+        <id column="UPDATE_USER" property="updateUser" />
+        <id column="UPDATE_TIME" property="updateTime" />
+        <id column="TECH" property="tech" />
+    </resultMap>
+
+    <resultMap id="HoldLotToSubDeptSpecialRuleMap" type="mfg.reporting.pojo.HoldLotToSubDeptSpecialRulePO">
+        <id column="FUNCTION_NAME" property="functionName" />
+        <id column="F_COMMENT" property="fcomment"/>
+        <id column="location" property="location"/>
+        <id column="LAYER" property="layer"/>
+        <id column="MODULE_OWNER" property="moduleOwner"/>
+        <id column="EQP_G" property="eqpG" />
+        <id column="SDEPT_ID1" property="sdeptId1"/>
+        <id column="SDEPT_ID2" property="sdeptId2"/>
+        <id column="UPDATE_USER" property="updateUser" />
+        <id column="UPDATE_TIME" property="updateTime" />
+    </resultMap>
+
+    <select id="getLotInfoByLotId" resultMap="HoldLotToSubDeptMap">
+        WITH SEARCH_INFO AS(
+        SELECT
+        C.PRODG1,C.FLOW_ID ,SUBSTR(B.PRODSPEC_ID,1,INSTR(B.PRODSPEC_ID,'.')-1) CHIP_BODY,A.LOT_ID,DECODE(B.LOT_ID,NULL,0,1) LOT_ID_REAL
+        ,B.PRODSPEC_ID,B.MAINPD_ID,B.ROUTEID,B.FAB ,NVL(A.OPE_NO,B.OPE_NO)OPE_NO,B.LOCATION
+        FROM(
+        SELECT #{lotId,jdbcType=VARCHAR} LOT_ID,#{opeNo,jdbcType=VARCHAR} OPE_NO FROM DUAL
+        )A LEFT JOIN (
+        SELECT LOT_ID,PRODSPEC_ID,OPE_NO,FAB,MAINPD_ID,SUBSTR(MAINPD_ID,1,INSTR(MAINPD_ID,'.')-1)ROUTEID,'N1A1'LOCATION
+        FROM ODS.V_REAL_TIME_LOT WHERE PW_FLAG =1  AND LOT_INV_STATE = 'OnFloor'
+        UNION
+        SELECT LOT_ID,PRODSPEC_ID,OPE_NO,FAB,MAINPD_ID,SUBSTR(MAINPD_ID,1,INSTR(MAINPD_ID,'.')-1)ROUTEID,'N1A3'LOCATION
+        FROM A1MFG.V_REAL_TIME_LOT_A3 WHERE PW_FLAG =1  AND LOT_INV_STATE = 'OnFloor'
+        )B
+        ON A.LOT_ID = B.LOT_ID
+        LEFT JOIN
+        (
+        SELECT PRODSPEC_ID,PRODG1,FLOW_ID  FROM ODS.WP_PRODUCT WHERE PRODG1 IS NOT NULL
+        UNION
+        SELECT PRODSPEC_ID,PRODG1,FLOW_ID FROM PWEB.WP_PRODUCT_A3 WHERE PRODG1 IS NOT NULL
+        )C
+        ON B.PRODSPEC_ID = C.PRODSPEC_ID
+        ),BASE_DETAIL AS(
+        SELECT A.*,B.EMP_ID PRODUCT_OWNER_EMPID,C.MODULE_OWNER,NVL(D.GROUP_TECH,SUBSTR(A.PRODG1,1,3)) TECH ,E.EQP_G
+        ,CASE WHEN E.MODULE IN('PHOTO','ETCH','TF','DIFF','WET','CMP') THEN E.MODULE
+        WHEN A.ROUTEID LIKE 'DYB%' THEN 'DYB'
+        WHEN A.ROUTEID LIKE 'YY' OR A.ROUTEID LIKE 'YX' THEN 'Rework'
+        ELSE A1MFG.GET_MODULE_QTIME(A.FLOW_ID,A.OPE_NO) END LOT_MFG_MODULE
+        ,CASE WHEN A.ROUTEID LIKE 'DYB%' THEN A.OPE_NO
+        WHEN A.ROUTEID LIKE 'YY' OR A.ROUTEID LIKE 'YX' THEN A.OPE_NO
+        ELSE F.OPER_NO END OPER_NO
+        FROM SEARCH_INFO A
+        LEFT JOIN(
+        SELECT PRODG1,CHIPBODY ,CONTACT1_ID EMP_ID,'N1A1'FAB  FROM PWEB.PRODUCT_OWNER
+        UNION ALL
+        SELECT PRODG1,CHIPBODY ,CONTACT1_ID EMP_ID,'N1A3'FAB  FROM PWEB.PRODUCT_OWNER@TO_A3PDW
+        )B
+        ON A.FAB = B.FAB AND A.CHIP_BODY  = B.CHIPBODY AND A.PRODG1 =B.PRODG1
+        LEFT JOIN PWEB.V_PRODUCT_SUMMARY C
+        ON A.PRODG1 = C.PRODG1 AND A.CHIP_BODY = C.CHIPBODY
+        LEFT JOIN PWEB.PRODUCT_TECH_INFO D
+        ON C.PRODG1 = D.PRODG1
+        LEFT JOIN ODS.WP_FLOW F
+        ON A.MAINPD_ID  = F.FLOW_KEY  AND A.OPE_NO =F.OPER_NO
+        LEFT JOIN A1MFG.PRODUCT_FLOW_INFO E
+        ON A.PRODG1 = E.PRODG1 AND A.OPE_NO = E.OPER_NO
+        )
+        SELECT A.PRODG1,A.CHIP_BODY,A.LOT_ID,A.LOT_ID_REAL,A.PRODSPEC_ID,A.MAINPD_ID,A.ROUTEID,A.FAB
+        ,A.OPER_NO OPE_NO,A.OPER_NO OPER_NO_REAL,A.PRODUCT_OWNER_EMPID,A.TECH,A.EQP_G,A.LOT_MFG_MODULE
+        ,CASE WHEN A.MODULE_OWNER='PB' THEN 'MODULE' WHEN A.MODULE_OWNER='PE' THEN 'TC'
+        WHEN A.MODULE_OWNER='RJ' THEN 'TB' ELSE A.MODULE_OWNER END MODULE_OWNER,A.LOCATION
+        FROM BASE_DETAIL A
+    </select>
+
+    <select id ="getDYBHoldLotSDeptInfo" resultMap="HoldLotToSubDeptMap">
+        WITH BASE_INFO AS(
+        SELECT #{prodG1} PRODG1, #{lotId} LOT_ID, #{opeNo} OPE_NO, #{prodSpecId} PRODSPEC_ID, #{fab} FAB
+        , #{routeId} ROUTEID, #{productOwnerEmpId} PRODUCT_OWNER_EMPID, #{moduleOwner} MODULE_OWNER, #{tech} TECH
+        , #{operNoReal,jdbcType=VARCHAR} OPER_NO_REAL
+        FROM DUAL
+        ), DYB_PATH_PSR_INFO AS(
+        SELECT LOTID, PSR_NO, ISSUE_DEPT, ISSUE_MEMBER, FLOW_ID, OPE_NO, ISSUE_TIME FROM(
+        SELECT LOTID, PSR_NO, ISSUE_DEPT, ISSUE_MEMBER, FLOW_ID, OPE_NO, EQ , ISSUE_TIME, ROW_NUMBER() OVER(PARTITION BY ISSUE_MEMBER ORDER BY ISSUE_TIME)RN
+        FROM(
+        SELECT REPLACE(LOTID, '.', '')LOTID, PSR_NO, ISSUE_DEPT, ISSUE_MEMBER, FLOW_ID, LAYER || '.' || OPER_NO OPE_NO , EQ, ISSUE_TIME FROM PWEB.PSR_DYBLOTEQINFO_6M
+        UNION ALL
+        SELECT REPLACE(LOTID, '.', '')LOTID, PSR_NO, ISSUE_DEPT, ISSUE_MEMBER, FLOW_ID, LAYER || '.' || OPER_NO OPE_NO , EQ, ISSUE_TIME FROM PWEB.PSR_DYBLOTEQINFO_6M_A3
+        UNION ALL
+        SELECT REPLACE(LOTID, '.', '')LOTID, PSR_NO, ISSUE_DEPT, ISSUE_MEMBER, FLOW_ID, LAYER || '.' || OPER_NO OPE_NO , EQ, ISSUE_TIME FROM SMUSR.PSR_DYBLOTEQINFO_3D_V@PSRDB
+        )A WHERE EXISTS(
+        SELECT 1 FROM(
+        SELECT ROUTEID, OPE_NO FROM BASE_INFO
+        )B WHERE A.FLOW_ID = B.ROUTEID AND A.OPE_NO = B.OPE_NO
+        ))WHERE RN = 1
+        ), DYB_SUB_PSR_INFO AS(
+        SELECT LOT_ID, CLAIM_TIME, PSR_NO, CLAIM_USER_ID FROM(
+        SELECT C.*, ROW_NUMBER() OVER(PARTITION BY LOT_ID ORDER BY CLAIM_TIME DESC)RN FROM(
+        SELECT B.LOT_ID, B.MAINPD_ID, B.OPE_NO, B.CAST_CATEGORY , B.CLAIM_MEMO, B.CLAIM_TIME
+        , REGEXP_SUBSTR(CLAIM_MEMO, 'PSR_NO:([^;]+);', 1, 1, NULL, 1) AS PSR_NO, CLAIM_USER_ID
+        FROM BASE_INFO A
+        JOIN ODS.FHOPEHS B
+        ON A.LOT_ID = B.LOT_ID
+        WHERE B.CLAIM_MEMO LIKE '%PSR_NO:%'
+        UNION ALL
+        SELECT B.LOT_ID, B.MAINPD_ID, B.OPE_NO, B.CAST_CATEGORY , B.CLAIM_MEMO, B.CLAIM_TIME
+        , REGEXP_SUBSTR(CLAIM_MEMO, 'PSR_NO:([^;]+);', 1, 1, NULL, 1) AS PSR_NO, CLAIM_USER_ID
+        FROM BASE_INFO A
+        JOIN PWEB.FHOPEHS_A3 B
+        ON A.LOT_ID = B.LOT_ID
+        WHERE B.CLAIM_MEMO LIKE '%PSR_NO:%'
+        )C
+        )WHERE RN = 1
+        ), USERS_INFO AS(
+        SELECT EMP_ID, CNAME, DEPT_ID || DECODE(SUBDEPT_ID, NULL, NULL, '-' || SUBDEPT_ID) SDEPT_ID , DEPT_CNAME || DECODE(SUBDEPT_ID, NULL, NULL, '(' || SDEPT_CNAME || ')') SDEPT_CNAME FROM WORKFLOW.HR_USERS WHERE BYWORK = '0'
+        )
+        SELECT D.*
+        , E.SDEPT_ID PRODUCT_OWNER_SUB_DEPT_ID, E.SDEPT_CNAME PRODUCT_OWNER_SUB_DEPT_CNAME
+        , F.SDEPT_ID , F.SDEPT_CNAME
+        , '抓取 提PSR人员信息作为HoldToSubDept归属' RULE
+        FROM(
+        SELECT A.PRODG1, A.OPE_NO,A.OPER_NO_REAL,A.FAB, A.PRODUCT_OWNER_EMPID, A.MODULE_OWNER, A.TECH
+        , NVL(B.ISSUE_MEMBER, C.CLAIM_USER_ID )PSR_USER_ID
+        FROM BASE_INFO A
+        LEFT JOIN DYB_PATH_PSR_INFO B
+        ON A.ROUTEID = B.FLOW_ID AND A.OPE_NO = B.OPE_NO
+        LEFT JOIN DYB_SUB_PSR_INFO C
+        ON A.LOT_ID = C.LOT_ID
+        )D
+        LEFT JOIN USERS_INFO E
+        ON
+        D.PRODUCT_OWNER_EMPID = E.EMP_ID
+        LEFT JOIN USERS_INFO F
+        ON
+        D.PSR_USER_ID = F.EMP_ID
+    </select>
+
+    <select id="getPhotoReworkHoldLotToSubDeptList" resultMap="HoldLotToSubDeptMap">
+        WITH BASE_INFO_DETAIL AS(
+        SELECT #{prodG1} PRODG1, #{lotId} LOT_ID, #{opeNo} OPE_NO, #{prodSpecId} PRODSPEC_ID
+        , #{fab} FAB, #{routeId} ROUTEID, #{productOwnerEmpId,jdbcType=VARCHAR} PRODUCT_OWNER_EMPID
+        , #{moduleOwner,jdbcType=VARCHAR} MODULE_OWNER, #{tech} TECH  ,#{eqpG ,jdbcType=VARCHAR} EQP_G
+        ,#{mainPdId}MAINPD_ID,#{lotMfgModule,jdbcType=VARCHAR}LOT_MFG_MODULE,#{location,jdbcType=VARCHAR} LOCATION
+        ,#{operNoReal,jdbcType=VARCHAR} OPER_NO_REAL
+        FROM DUAL
+        ),DYB_LOT_LAST_OPENO AS(
+        SELECT LOT_ID,OPE_NO FROM(
+        SELECT LOT_ID,OPE_NO,CLAIM_TIME,ROW_NUMBER()OVER(PARTITION BY LOT_ID ORDER BY CLAIM_TIME DESC ) RN FROM(
+        SELECT LOT_ID,OPE_NO,CLAIM_TIME
+        FROM ODS.FHOPEHS A
+        WHERE (OPE_CATEGORY = 'Branch' OR OPE_CATEGORY = 'Rework')
+        AND MAINPD_ID NOT LIKE 'YY%' AND  MAINPD_ID NOT LIKE 'YX%' AND MAINPD_ID NOT LIKE 'DYB%' AND MAINPD_ID NOT LIKE 'B%'
+        AND EXISTS(
+        SELECT 1 FROM(
+        SELECT LOT_ID FROM  BASE_INFO_DETAIL
+        WHERE MAINPD_ID LIKE 'YY%' OR MAINPD_ID LIKE 'YX%' OR MAINPD_ID LIKE 'B%' OR MAINPD_ID LIKE 'DYB%'
+        )B WHERE A.LOT_ID = B.LOT_ID
+        )
+        UNION ALL
+        SELECT LOT_ID,OPE_NO,CLAIM_TIME
+        FROM ODS.FHOPEHS@TO_A3PDW A
+        WHERE (OPE_CATEGORY = 'Branch' OR OPE_CATEGORY = 'Rework')
+        AND MAINPD_ID NOT LIKE 'YY%' AND  MAINPD_ID NOT LIKE 'YX%' AND MAINPD_ID NOT LIKE 'DYB%' AND MAINPD_ID NOT LIKE 'B%'
+        AND EXISTS(
+        SELECT 1 FROM(
+        SELECT LOT_ID FROM  BASE_INFO_DETAIL
+        WHERE MAINPD_ID LIKE 'YY%' OR MAINPD_ID LIKE 'YX%' OR MAINPD_ID LIKE 'B%' OR MAINPD_ID LIKE 'DYB%'
+        )B WHERE A.LOT_ID = B.LOT_ID
+        )
+        ))WHERE RN=1
+        ),BASE_INFO AS(
+        SELECT
+        PRODG1,PRODSPEC_ID,OPER_NO_REAL,LOT_MFG_MODULE,FAB,PRODUCT_OWNER_EMPID,MODULE_OWNER,TECH,LOCATION,OPE_NO,OPER_SEQ,EQP_G
+        FROM(
+        SELECT E.PRODG1,E.PRODSPEC_ID,E.OPER_NO_REAL,E.LOT_MFG_MODULE,E.FAB,E.PRODUCT_OWNER_EMPID,E.MODULE_OWNER,E.TECH,E.LOCATION
+        ,F.OPER_NO OPE_NO,F.OPER_SEQ,F.EQP_G,ROW_NUMBER()OVER(PARTITION BY E.PRODG1 ORDER BY F.OPER_SEQ DESC)RN
+        FROM(
+        SELECT A.PRODG1,A.PRODSPEC_ID ,B.OPE_NO,A.OPER_NO_REAL,A.LOT_MFG_MODULE
+        ,A.FAB,A.PRODUCT_OWNER_EMPID,A.MODULE_OWNER,A.TECH,A.LOCATION,C.OPER_SEQ
+        FROM BASE_INFO_DETAIL A
+        LEFT JOIN DYB_LOT_LAST_OPENO B
+        ON A.LOT_ID = B.LOT_ID
+        LEFT JOIN A1MFG.PRODUCT_FLOW_INFO C
+        ON A.PRODG1 = C.PRODG1 AND B.OPE_NO = C.OPER_NO
+        LEFT JOIN ODS.WP_PRODUCT D
+        ON A.PRODSPEC_ID =D.PRODSPEC_ID
+        )E LEFT JOIN A1MFG.PRODUCT_FLOW_INFO F
+        ON E.PRODG1 =F.PRODG1 AND  F.OPER_SEQ > E.OPER_SEQ AND F.MODULE = E.LOT_MFG_MODULE AND F.MAIN_OPE_NO ='Y'
+        )WHERE RN=1
+        )
+        , SDEPT_INFO AS(
+        SELECT DISTINCT DEPT_ID || DECODE(SUBDEPT_ID, NULL, NULL, '-' || SUBDEPT_ID) SDEPT_ID , DEPT_CNAME || DECODE(SUBDEPT_ID, NULL, NULL, '(' || SDEPT_CNAME || ')') SDEPT_CNAME FROM WORKFLOW.HR_USERS WHERE BYWORK = '0'
+        ), USERS_INFO AS(
+        SELECT EMP_ID, CNAME, DEPT_ID || DECODE(SUBDEPT_ID, NULL, NULL, '-' || SUBDEPT_ID) SDEPT_ID , DEPT_CNAME || DECODE(SUBDEPT_ID, NULL, NULL, '(' || SDEPT_CNAME || ')') SDEPT_CNAME FROM WORKFLOW.HR_USERS WHERE BYWORK = '0'
+        )
+        SELECT
+        PRODG1,OPE_NO,OPER_NO_REAL,FAB,PRODUCT_OWNER_EMPID,MODULE_OWNER,TECH,PRODUCT_OWNER_SUB_DEPT_ID,PRODUCT_OWNER_SUB_DEPT_CNAME,SDEPT_ID,SDEPT_CNAME,RULE
+        FROM(
+        SELECT
+        D.PRODG1, D.OPE_NO,D.OPER_NO_REAL, D.FAB, D.PRODUCT_OWNER_EMPID, D.MODULE_OWNER, D.TECH
+        , E.SDEPT_ID PRODUCT_OWNER_SUB_DEPT_ID, E.SDEPT_CNAME PRODUCT_OWNER_SUB_DEPT_CNAME
+        , CASE WHEN RULE = 'SDEPT' THEN  F.SDEPT_ID
+        WHEN RULE = 'PRODUCT_OWNER' THEN  E.SDEPT_ID
+        WHEN RULE = 'LAST_MAIN_OPENO_RULE' THEN 'FOLLOW_LAST_OPENO'
+        WHEN RULE IS NULL THEN '未匹配Rule'  END SDEPT_ID
+        ,CASE WHEN RULE = 'SDEPT' THEN  F.SDEPT_CNAME
+        WHEN RULE = 'PRODUCT_OWNER' THEN  E.SDEPT_CNAME END SDEPT_CNAME
+        ,'TECH:'||D.RULE_TECH||'; EQP_G:'||D.RULE_EQPG||'; MODULE_OWNER:'||D.RULE_MODULE_OWNER||'; OPE_NO:'||D.RULE_OPE_NO||'; RULE:'
+        ||DECODE(D.RULE,'LAST_MAIN_OPENO_RULE','Follow上一主站点','PRODUCT_OWNER','指定Product Owner','SDEPT','指定部门') ||DECODE(D.RULE,'SDEPT','; SDEPT_ID:'||D.SDEPT_ID)RULE
+        FROM(
+        SELECT A.*,B.RULE,B.SDEPT_ID,B.TECH RULE_TECH,B.EQP_G RULE_EQPG,B.MODULE_OWNER RULE_MODULE_OWNER,B.OPE_NO RULE_OPE_NO
+        FROM BASE_INFO A
+        LEFT JOIN A1MFG.HOLD_TO_SDEPT_RULE B
+        ON A.MODULE_OWNER = B.MODULE_OWNER AND A.LOCATION = B.LOCATION AND A.EQP_G LIKE REPLACE(B.EQP_G ,'*','%') AND A.OPE_NO LIKE REPLACE(B.OPE_NO ,'*','%') AND A.PRODG1 LIKE REPLACE(B.TECH ,'*','%')
+        )D
+        LEFT JOIN USERS_INFO E
+        ON D.PRODUCT_OWNER_EMPID  = E.EMP_ID
+        LEFT JOIN SDEPT_INFO F
+        ON D.SDEPT_ID  = F.SDEPT_ID
+        )ORDER BY DECODE(SDEPT_ID,'未匹配Rule',1,'FOLLOW_LAST_OPENO',2,3)
+    </select>
+
+
+    <select id="getMainHoldLotToSubDeptList" resultMap="HoldLotToSubDeptMap">
+        WITH BASE_INFO AS(
+        SELECT #{prodG1} PRODG1, #{lotId} LOT_ID, #{opeNo} OPE_NO, #{prodSpecId} PRODSPEC_ID
+        , #{fab} FAB, #{routeId} ROUTEID, #{productOwnerEmpId,jdbcType=VARCHAR} PRODUCT_OWNER_EMPID
+        , #{moduleOwner,jdbcType=VARCHAR} MODULE_OWNER, #{tech} TECH  ,#{eqpG ,jdbcType=VARCHAR} EQP_G
+        ,#{location,jdbcType=VARCHAR} LOCATION,#{operNoReal,jdbcType=VARCHAR} OPER_NO_REAL
+        FROM DUAL
+        ), USERS_INFO AS(
+        SELECT EMP_ID, CNAME, DEPT_ID || DECODE(SUBDEPT_ID, NULL, NULL, '-' || SUBDEPT_ID) SDEPT_ID , DEPT_CNAME || DECODE(SUBDEPT_ID, NULL, NULL, '(' || SDEPT_CNAME || ')') SDEPT_CNAME FROM WORKFLOW.HR_USERS WHERE BYWORK = '0'
+        ), SDEPT_INFO AS(
+        SELECT DISTINCT DEPT_ID || DECODE(SUBDEPT_ID, NULL, NULL, '-' || SUBDEPT_ID) SDEPT_ID , DEPT_CNAME || DECODE(SUBDEPT_ID, NULL, NULL, '(' || SDEPT_CNAME || ')') SDEPT_CNAME FROM WORKFLOW.HR_USERS WHERE BYWORK = '0'
+        ),PATH_EQPG_INFO AS(
+        SELECT ROUTEID,OPE_NO,PRODSPEC_ID,EQP_G FROM(
+        SELECT
+        ROUTEID,OPE_NO,PRODSPEC_ID,C.EQUIPMENTID,D.EQP_G
+        ,ROW_NUMBER()OVER(PARTITION BY 1 ORDER BY DECODE(PASS_FLG_PRC||PASS_FLG_MFG,'YY',1,'YN',2,'NY',3,4), LENGTH(EQP_G))RN
+        FROM(
+        SELECT A.ROUTEID,A.OPE_NO,A.PRODSPEC_ID,B.EQUIPMENTID,B.PASS_FLG_PRC ,B.PASS_FLG_MFG
+        FROM BASE_INFO A
+        JOIN RTD.CSFRINHIBIT B
+        ON  A.PRODSPEC_ID = B.PRODUCTID AND A.ROUTEID = B.ROUTEID  AND A.OPE_NO =B.OPENO
+        UNION ALL
+        SELECT A.ROUTEID,A.OPE_NO,A.PRODSPEC_ID,B.EQUIPMENTID,B.PASS_FLG_PRC ,B.PASS_FLG_MFG
+        FROM BASE_INFO A
+        JOIN MM.CSFRINHIBIT_T@TO_A3PDW B
+        ON  A.PRODSPEC_ID = B.PRODUCTID AND A.ROUTEID = B.ROUTEID  AND A.OPE_NO =B.OPENO
+        )C LEFT JOIN (
+        SELECT EQP_ID,EQP_G FROM PWEB.EQP_ID_USE_STD WHERE LENGTH(EQP_ID)= 5
+        UNION ALL
+        SELECT EQP_ID,EQP_G FROM PWEB.EQP_ID_USE_STD_A3 WHERE LENGTH(EQP_ID)= 6
+        )D
+        ON C.EQUIPMENTID = D.EQP_ID
+        )WHERE RN =1
+        )
+        SELECT
+        PRODG1,OPE_NO,OPER_NO_REAL,FAB,PRODUCT_OWNER_EMPID,MODULE_OWNER,TECH,PRODUCT_OWNER_SUB_DEPT_ID,PRODUCT_OWNER_SUB_DEPT_CNAME,SDEPT_ID,SDEPT_CNAME,RULE
+        FROM(
+        SELECT
+        A.PRODG1, A.OPE_NO,A.OPER_NO_REAL, A.FAB, A.PRODUCT_OWNER_EMPID, A.MODULE_OWNER, A.TECH
+        , E.SDEPT_ID PRODUCT_OWNER_SUB_DEPT_ID, E.SDEPT_CNAME PRODUCT_OWNER_SUB_DEPT_CNAME
+        , CASE WHEN RULE = 'SDEPT' THEN  F.SDEPT_ID
+        WHEN RULE = 'PRODUCT_OWNER' THEN  E.SDEPT_ID
+        WHEN RULE = 'LAST_MAIN_OPENO_RULE' THEN 'FOLLOW_LAST_OPENO'
+        WHEN RULE IS NULL THEN '未匹配Rule'  END SDEPT_ID
+        ,CASE WHEN RULE = 'SDEPT' THEN  F.SDEPT_CNAME
+        WHEN RULE = 'PRODUCT_OWNER' THEN  E.SDEPT_CNAME END SDEPT_CNAME
+        ,'TECH:'||A.RULE_TECH||'; EQP_G:'||A.RULE_EQPG||'; MODULE_OWNER:'||A.RULE_MODULE_OWNER||'; OPE_NO:'||A.RULE_OPE_NO||'; RULE:'
+        ||DECODE(A.RULE,'LAST_MAIN_OPENO_RULE','Follow上一主站点','PRODUCT_OWNER','指定Product Owner','SDEPT','指定部门') ||DECODE(A.RULE,'SDEPT','; SDEPT_ID:'||A.SDEPT_ID)RULE
+        FROM(
+        SELECT A.PRODG1,A.LOT_ID,A.OPE_NO,A.OPER_NO_REAL,A.PRODSPEC_ID,A.FAB,A.ROUTEID,A.PRODUCT_OWNER_EMPID,A.MODULE_OWNER,A.TECH,NVL(A.EQP_G,C.EQP_G)EQP_G
+        ,B.TECH RULE_TECH,B.EQP_G RULE_EQPG,B.MODULE_OWNER RULE_MODULE_OWNER
+        ,B.OPE_NO RULE_OPE_NO,B.SDEPT_ID,B.RULE
+        FROM BASE_INFO A
+        LEFT JOIN PATH_EQPG_INFO C
+        ON A.ROUTEID = C.ROUTEID  AND A.OPE_NO = C.OPE_NO  AND A.PRODSPEC_ID = C.PRODSPEC_ID
+        LEFT JOIN A1MFG.HOLD_TO_SDEPT_RULE B
+        ON A.MODULE_OWNER = B.MODULE_OWNER AND A.LOCATION = B.LOCATION AND NVL(A.EQP_G,C.EQP_G) LIKE REPLACE(B.EQP_G ,'*','%') AND A.OPE_NO LIKE REPLACE(B.OPE_NO ,'*','%') AND A.PRODG1 LIKE REPLACE(B.TECH ,'*','%')
+        )A LEFT JOIN USERS_INFO E
+        ON A.PRODUCT_OWNER_EMPID  = E.EMP_ID
+        LEFT JOIN SDEPT_INFO F
+        ON A.SDEPT_ID  = F.SDEPT_ID
+        )ORDER BY DECODE(SDEPT_ID,'未匹配Rule',1,'FOLLOW_LAST_OPENO',2,3)
+    </select>
+
+    <select id="getLastOpeLotInfoByLotId" resultMap="HoldLotToSubDeptMap">
+        WITH BASE_INFO_LST AS(
+        SELECT #{prodG1} PRODG1, #{lotId} LOT_ID, #{opeNo} OPE_NO, #{prodSpecId} PRODSPEC_ID
+        , #{fab} FAB, #{routeId} ROUTEID, #{productOwnerEmpId,jdbcType=VARCHAR} PRODUCT_OWNER_EMPID
+        , #{moduleOwner,jdbcType=VARCHAR} MODULE_OWNER, #{tech} TECH  ,#{eqpG ,jdbcType=VARCHAR} EQP_G
+        ,#{mainPdId}MAINPD_ID,#{lotMfgModule,jdbcType=VARCHAR}LOT_MFG_MODULE,#{location,jdbcType=VARCHAR} LOCATION
+        ,#{operNoReal,jdbcType=VARCHAR} OPER_NO_REAL
+        FROM DUAL
+        )
+        ,BASE_SEARCH_INFO AS(
+        SELECT PRODG1,LOT_ID,PRODSPEC_ID,FAB,ROUTEID,PRODUCT_OWNER_EMPID,MODULE_OWNER,TECH
+        ,MAINPD_ID,OPE_NO,LOCATION FROM(
+        SELECT PRODG1,LOT_ID,PRODSPEC_ID,FAB,ROUTEID,PRODUCT_OWNER_EMPID,MODULE_OWNER,TECH,MAINPD_ID
+        ,ROW_NUMBER()OVER(PARTITION BY PRODSPEC_ID ORDER BY OPER_SEQ DESC)RN
+        ,OPER_NO OPE_NO,LOCATION FROM(
+        SELECT E.*,ROW_NUMBER()OVER(PARTITION BY PRODSPEC_ID ORDER BY OPER_SEQ DESC)RN FROM(
+        SELECT C.PRODG1,C.LOT_ID,C.PRODSPEC_ID,C.FAB,C.ROUTEID,C.PRODUCT_OWNER_EMPID,C.MODULE_OWNER,C.TECH,C.MAINPD_ID,D.OPER_SEQ,D.OPER_NO,C.LOT_MFG_MODULE
+        ,CASE WHEN SUBSTR(D.OPER_NO,4,3) NOT IN ('PPB','EEA','EEB','EEI','TTS')
+        AND SUBSTR(D.OPER_NO,4,2) &lt;&gt;'SX'
+        AND SUBSTR(D.OPER_NO,5,1) &lt;&gt;'Q'
+        AND SUBSTR(D.OPER_NO,4,1) &lt;&gt; 'W'
+        THEN 'Y'
+        WHEN SUBSTR(D.OPER_NO,4,3) = 'WPX' THEN 'Y'
+        ELSE 'N' END MAIN_OPE_NO, A1MFG.GET_MODULE_QTIME(C.MAINPD_ID,D.OPER_NO)TARGET_MODULE
+        ,C.LOCATION
+        FROM(
+        SELECT A.*,B.OPER_SEQ FROM BASE_INFO_LST A
+        LEFT JOIN ODS.WP_FLOW B
+        ON A.MAINPD_ID = B.FLOW_KEY  AND A.OPE_NO = B.OPER_NO
+        )C LEFT JOIN ODS.WP_FLOW D
+        ON C.MAINPD_ID = D.FLOW_KEY
+        WHERE D.OPER_SEQ &lt; C.OPER_SEQ  AND SUBSTR(D.OPER_NO,5,1) &lt;&gt;'Q'
+        )E WHERE MAIN_OPE_NO ='Y' AND LOT_MFG_MODULE = TARGET_MODULE
+        )) WHERE RN =1)
+        ,PATH_EQPG_INFO AS(
+        SELECT ROUTEID,OPE_NO,PRODSPEC_ID,EQP_G FROM(
+        SELECT
+        ROUTEID,OPE_NO,PRODSPEC_ID,C.EQUIPMENTID,D.EQP_G
+        ,ROW_NUMBER()OVER(PARTITION BY 1 ORDER BY DECODE(PASS_FLG_PRC||PASS_FLG_MFG,'YY',1,'YN',2,'NY',3,4), LENGTH(EQP_G))RN
+        FROM(
+        SELECT A.ROUTEID,A.OPE_NO,A.PRODSPEC_ID,B.EQUIPMENTID,B.PASS_FLG_PRC ,B.PASS_FLG_MFG
+        FROM BASE_SEARCH_INFO A
+        JOIN RTD.CSFRINHIBIT B
+        ON  A.PRODSPEC_ID = B.PRODUCTID AND A.ROUTEID = B.ROUTEID  AND A.OPE_NO =B.OPENO
+        )C LEFT JOIN (
+        SELECT EQP_ID,EQP_G FROM PWEB.EQP_ID_USE_STD WHERE LENGTH(EQP_ID)= 5
+        UNION ALL
+        SELECT EQP_ID,EQP_G FROM PWEB.EQP_ID_USE_STD_A3 WHERE LENGTH(EQP_ID)= 6
+        )D
+        ON C.EQUIPMENTID = D.EQP_ID
+        )WHERE RN =1
+        ),BASE_DETAILS AS(
+        SELECT PRODG1,C.LOT_ID,C.PRODSPEC_ID,C.FAB,C.ROUTEID,C.PRODUCT_OWNER_EMPID,C.MODULE_OWNER
+        ,C.TECH,C.MAINPD_ID,C.OPE_NO,NVL(C.EQP_G,D.EQP_G)EQP_G,C.LOCATION FROM(
+        SELECT A.*,NVL(B.EQP_G,C.EQP_G)EQP_G FROM BASE_SEARCH_INFO A
+        LEFT JOIN PWEB.OPE_NO_INLINE_FLOW_PSTD B
+        ON A.PRODSPEC_ID =B.PRODSPEC_ID AND A.OPE_NO = B.OPE_NO
+        LEFT JOIN PWEB.OPE_NO_INLINE_FLOW_PSTD C
+        ON A.PRODSPEC_ID = C.PRODSPEC_ID AND A.OPE_NO = C.OPE_NO
+        )C JOIN PATH_EQPG_INFO D
+        ON C.ROUTEID = D.ROUTEID  AND C.OPE_NO = D.OPE_NO  AND C.PRODSPEC_ID = D.PRODSPEC_ID
+        ), USERS_INFO AS(
+        SELECT EMP_ID, CNAME, DEPT_ID || DECODE(SUBDEPT_ID, NULL, NULL, '-' || SUBDEPT_ID) SDEPT_ID , DEPT_CNAME || DECODE(SUBDEPT_ID, NULL, NULL, '(' || SDEPT_CNAME || ')') SDEPT_CNAME FROM WORKFLOW.HR_USERS WHERE BYWORK = '0'
+        ), SDEPT_INFO AS(
+        SELECT DISTINCT DEPT_ID || DECODE(SUBDEPT_ID, NULL, NULL, '-' || SUBDEPT_ID) SDEPT_ID , DEPT_CNAME || DECODE(SUBDEPT_ID, NULL, NULL, '(' || SDEPT_CNAME || ')') SDEPT_CNAME FROM WORKFLOW.HR_USERS WHERE BYWORK = '0'
+        )
+        SELECT
+        A.PRODG1, A.OPE_NO,A.OPER_NO_REAL, A.FAB, A.PRODUCT_OWNER_EMPID, A.MODULE_OWNER, A.TECH
+        , E.SDEPT_ID PRODUCT_OWNER_SUB_DEPT_ID, E.SDEPT_CNAME PRODUCT_OWNER_SUB_DEPT_CNAME
+        , CASE WHEN RULE = 'SDEPT' THEN  F.SDEPT_ID
+        WHEN RULE = 'PRODUCT_OWNER' THEN  E.SDEPT_ID
+        WHEN RULE = 'LAST_MAIN_OPENO_RULE' THEN 'FOLLOW_LAST_OPENO'--在此情形下不可能走这条RULE
+        WHEN RULE IS NULL THEN '未匹配Rule'  END SDEPT_ID
+        ,CASE WHEN RULE = 'SDEPT' THEN  F.SDEPT_CNAME
+        WHEN RULE = 'PRODUCT_OWNER' THEN  E.SDEPT_CNAME END SDEPT_CNAME
+        ,'TECH:'||A.RULE_TECH||'; EQP_G:'||A.RULE_EQPG||'; MODULE_OWNER:'||A.RULE_MODULE_OWNER||'; OPE_NO:'||A.RULE_OPE_NO||'; RULE:'
+        ||DECODE(A.RULE,'LAST_MAIN_OPENO_RULE','Follow上一主站点','PRODUCT_OWNER','指定Product Owner','SDEPT','指定部门') ||DECODE(A.RULE,'SDEPT','; SDEPT_ID:'||A.SDEPT_ID) ||'(Flow 上一个主站点RULE)'RULE
+        FROM(
+        SELECT
+        A.PRODG1,A.LOT_ID,A.OPE_NO,A.OPER_NO_REAL,A.PRODSPEC_ID,A.FAB,A.ROUTEID,A.PRODUCT_OWNER_EMPID,A.MODULE_OWNER,A.TECH,A.EQP_G
+        ,B.TECH RULE_TECH,B.EQP_G RULE_EQPG,B.MODULE_OWNER RULE_MODULE_OWNER
+        ,B.OPE_NO RULE_OPE_NO,B.SDEPT_ID,B.RULE
+        FROM BASE_DETAILS A
+        LEFT JOIN A1MFG.HOLD_TO_SDEPT_RULE B
+        ON A.MODULE_OWNER = B.MODULE_OWNER AND A.LOCATION = B.LOCATION AND A.EQP_G LIKE REPLACE(B.EQP_G ,'*','%') AND A.OPE_NO LIKE REPLACE(B.OPE_NO ,'*','%') AND A.PRODG1 LIKE REPLACE(B.TECH ,'*','%')
+        )A LEFT JOIN USERS_INFO E
+        ON A.PRODUCT_OWNER_EMPID  = E.EMP_ID
+        LEFT JOIN SDEPT_INFO F
+        ON A.SDEPT_ID  = F.SDEPT_ID
+    </select>
+
+    <select id="getHoldLotToSubDeptRuleInfo" resultMap="HoldLotToSubDeptRuleMap">
+        SELECT A.EQP_G,B.MODULE,A.MODULE_OWNER,A.OPE_NO,A.RULE
+        ,CASE WHEN A.RULE = 'SDEPT' THEN '指定课'
+        WHEN A.RULE = 'PRODUCT_OWNER' THEN '指定产品Owner'
+        WHEN A.RULE = 'LAST_MAIN_OPENO_RULE' THEN 'Follow 上一主站点' END RULE_DESC
+        ,A.SDEPT_ID,A.UPDATE_TIME,A.TECH,A.UPDATE_FLAG
+        ,A.LOCATION,C.SDEPT_CNAME
+        FROM A1MFG.HOLD_TO_SDEPT_RULE A
+        LEFT JOIN (
+        SELECT DISTINCT EQP_G,MODULE  FROM PWEB.EQP_ID_USE_STD
+        UNION
+        SELECT DISTINCT EQP_G,MODULE  FROM PWEB.EQP_ID_USE_STD_A3
+        )B
+        ON A.EQP_G = B.EQP_G
+        LEFT JOIN(
+        SELECT
+        DEPT_ID||DECODE(SUBDEPT_ID,NULL,NULL,'-')|| DECODE(SUBDEPT_ID,NULL,NULL,SUBDEPT_ID) SDEPT_ID,
+        DEPT_CNAME||DECODE(SDEPT_CNAME,NULL,NULL,'(')||DECODE(SDEPT_CNAME,NULL,NULL,SDEPT_CNAME)||DECODE(SDEPT_CNAME,NULL,NULL,')')SDEPT_CNAME
+        FROM(
+        SELECT DISTINCT DEPT_ID,SUBDEPT_ID,DEPT_CNAME,SDEPT_CNAME  FROM WORKFLOW.HR_USERS
+        )
+        )C
+        ON A.SDEPT_ID = C.SDEPT_ID
+        WHERE 1=1
+        <if test="moduleOwner != null and moduleOwner != ''">
+            AND MODULE_OWNER = #{moduleOwner,jdbcType=VARCHAR}
+        </if>
+        <if test="eqpG != null and eqpG != ''">
+            AND  #{eqpG,jdbcType=VARCHAR} like REPLACE(A.EQP_G,'*','%')
+        </if>
+        <if test="module != null and module != ''">
+            AND B.module =  #{module,jdbcType=VARCHAR}
+        </if>
+        <if test="updateFlag != null and updateFlag != '' and updateFlag != 'all'">
+            AND A.UPDATE_FLAG =  #{updateFlag,jdbcType=VARCHAR}
+        </if>
+        ORDER BY A.MODULE_OWNER,A.TECH,A.EQP_G,A.OPE_NO
+    </select>
+
+    <update id="updateHoldLotToSubDeptRuleInfo">
+
+        UPDATE A1MFG.HOLD_TO_SDEPT_RULE
+        SET
+        RULE = #{rule,jdbcType=VARCHAR},
+        SDEPT_ID = #{sdeptId,jdbcType=VARCHAR},
+        UPDATE_USER= #{updateUser,jdbcType=VARCHAR},
+        UPDATE_TIME = SYSDATE
+        WHERE MODULE_OWNER = #{moduleOwner,jdbcType=VARCHAR} AND EQP_G = #{eqpG,jdbcType=VARCHAR} AND LOCATION = #{location,jdbcType=VARCHAR}
+    </update>
+
+    <insert id="insertHoldLotToSubDeptRuleInfo">
+        INSERT INTO A1MFG.HOLD_TO_SDEPT_RULE
+        (EQP_G,MODULE_OWNER,OPE_NO,RULE,SDEPT_ID,UPDATE_USER,UPDATE_TIME,TECH,UPDATE_FLAG,LOCATION)
+        VALUES
+        (#{eqpG,jdbcType=VARCHAR},#{moduleOwner,jdbcType=VARCHAR},#{opeNo,jdbcType=VARCHAR}
+        ,#{rule,jdbcType=VARCHAR},#{sdeptId,jdbcType=VARCHAR},#{updateUser,jdbcType=VARCHAR},SYSDATE
+        ,#{tech,jdbcType=VARCHAR},#{updateFlag,jdbcType=VARCHAR},#{location,jdbcType=VARCHAR})
+    </insert>
+
+    <select id="selectOneHoldLotToSubDeptRule" resultMap="HoldLotToSubDeptRuleMap">
+        SELECT EQP_G,MODULE_OWNER,OPE_NO,RULE,SDEPT_ID,UPDATE_USER,UPDATE_TIME,TECH,UPDATE_FLAG,LOCATION FROM A1MFG.HOLD_TO_SDEPT_RULE
+        WHERE MODULE_OWNER = #{moduleOwner,jdbcType=VARCHAR} AND EQP_G = #{eqpG,jdbcType=VARCHAR} AND OPE_NO = #{opeNo,jdbcType=VARCHAR} AND LOCATION = #{location,jdbcType=VARCHAR} AND TECH = #{tech,jdbcType=VARCHAR}
+        AND ROWNUM = 1
+    </select>
+
+    <select id="testInsertHoldLotRule" resultMap="HoldLotToSubDeptRuleMap">
+        WITH HOLD_RULE AS(
+        SELECT #{eqpG,jdbcType=VARCHAR} EQP_G,#{moduleOwner,jdbcType=VARCHAR} MODULE_OWNER,#{opeNo,jdbcType=VARCHAR} OPE_NO
+        ,#{rule,jdbcType=VARCHAR} RULE,#{sdeptId,jdbcType=VARCHAR} SDEPT_ID,#{location,jdbcType=VARCHAR} LOCATION
+        ,#{tech,jdbcType=VARCHAR} TECH,'static' UPDATE_FLAG,#{updateUser,jdbcType=VARCHAR} UPDATE_USER,SYSDATE UPDATE_TIME FROM DUAL
+        )
+        SELECT A.EQP_G,A.MODULE_OWNER,A.RULE,A.SDEPT_ID,A.LOCATION,C.MODULE FROM HOLD_RULE A
+        LEFT JOIN A1MFG.HOLD_TO_SDEPT_RULE B
+        ON A.EQP_G = B.EQP_G AND A.MODULE_OWNER = B.MODULE_OWNER  AND A.LOCATION = B.LOCATION
+        LEFT JOIN (
+        SELECT DISTINCT EQP_G,MODULE,'N1A1'LOCATION  FROM PWEB.EQP_ID_USE_STD
+        UNION
+        SELECT DISTINCT EQP_G,MODULE,'N1A3'LOCATION   FROM PWEB.EQP_ID_USE_STD_A3
+        )C
+        ON A.EQP_G = C.EQP_G
+        WHERE B.EQP_G IS NULL AND ROWNUM = 1
+    </select>
+
+    <select id="getSpecialRuleList" resultMap="HoldLotToSubDeptSpecialRuleMap">
+        SELECT FUNCTION_NAME,F_COMMENT,KEY1 LOCATION,KEY2 LAYER,KEY3 MODULE_OWNER,KEY4 EQP_G,KEY5 SDEPT_ID1,KEY6 SDEPT_ID2
+        FROM PWEB.COMMENT_SUMMARY
+        WHERE FUNCTION_NAME LIKE 'HoldLotToSDept%'
+    </select>
+
+    <select id="insertSpecialRule" parameterType="mfg.reporting.pojo.HoldLotToSubDeptSpecialRulePO">
+        INSERT INTO PWEB.COMMENT_SUMMARY
+        (FUNCTION_NAME,F_COMMENT,KEY1,KEY2,KEY3,KEY4,KEY5,KEY6,UPDATE_USER,UPDATE_TIME)
+        VALUES
+        (#{functionName,jdbcType=VARCHAR},#{FComment,jdbcType=VARCHAR},#{location,jdbcType=VARCHAR},#{layer,jdbcType=VARCHAR}
+        ,#{moduleOwner,jdbcType=VARCHAR},#{eqpG,jdbcType=VARCHAR},#{sdeptId1,jdbcType=VARCHAR},#{sdeptId2,jdbcType=VARCHAR}
+        ,#{updateUser,jdbcType=VARCHAR},SYSDATE)
+    </select>
+
+    <select id="insertHoldLotToSubDeptRuleList" >
+        MERGE INTO A1MFG.HOLD_TO_SDEPT_RULE A
+        USING(
+        SELECT TRIM(UPDATE_FLAG)UPDATE_FLAG
+        ,TRIM(LOCATION)LOCATION
+        ,TRIM(EQP_G)EQP_G
+        ,TRIM(MODULE_OWNER)MODULE_OWNER
+        ,CASE WHEN TRIM(RULE) = '指定课' THEN 'SDEPT'
+        WHEN TRIM(RULE) = '指定产品Owner' THEN 'PRODUCT_OWNER'
+        WHEN TRIM(RULE) = 'Follow 上一主站点' THEN 'LAST_MAIN_OPENO_RULE' END RULE
+        ,TRIM(SDEPT_ID)SDEPT_ID,UPDATE_USER FROM(
+        <foreach collection="list" separator=" UNION ALL " item="item">
+            SELECT 'static'UPDATE_FLAG
+            , #{item.Location,jdbcType=VARCHAR}LOCATION
+            ,#{item.eqpG,jdbcType=VARCHAR}EQP_G
+            ,#{item.moduleOwner,jdbcType=VARCHAR}MODULE_OWNER
+            ,#{item.rule,jdbcType=VARCHAR}RULE
+            ,#{item.sdeptId,jdbcType=VARCHAR}SDEPT_ID
+            ,#{item.updateUser,jdbcType=VARCHAR} UPDATE_USER FROM DUAL
+        </foreach>
+        )
+        ) B
+        ON(A.LOCATION=B.LOCATION AND A.EQP_G = B.EQP_G AND A.MODULE_OWNER = B.MODULE_OWNER AND A.UPDATE_FLAG = B.UPDATE_FLAG)
+        WHEN MATCHED THEN
+        UPDATE SET A.RULE = B.RULE ,A.SDEPT_ID = B.SDEPT_ID ,A.UPDATE_USER = B.UPDATE_USER,A.UPDATE_TIME = SYSDATE
+        WHEN NOT MATCHED THEN
+        INSERT
+        (EQP_G, MODULE_OWNER, OPE_NO, RULE, SDEPT_ID, UPDATE_USER, UPDATE_TIME, TECH, UPDATE_FLAG, LOCATION)
+        VALUES(B.EQP_G, B.MODULE_OWNER,'*',B.RULE,B.SDEPT_ID,B.UPDATE_USER,SYSDATE,'*',B.UPDATE_FLAG,B.LOCATION)
+    </select>
+</mapper>

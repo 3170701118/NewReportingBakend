@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.ReportingDemandsListMapper">
+
+<select id="selectDemandsList"  resultType="mfg.reporting.pojo.ReportingDemandListPO">
+  SELECT DEMANDS_ID,DEMANDS_NAME,DEMANDS_CONTENT,"RANK",DEMANDS_USER,DEVELOPER,COMPLETION_RATE,STATUS,DEMANDS_CONFIRM_DATE
+  ,DEMANDS_FORECAST_DATE,START_DATE,COMPLETE_DATE,REMARK,UPDATE_TIME,UPDATE_USER 
+  FROM A1MFG.REPORTING_DEMANDS_LIST
+  WHERE 1=1 
+    <if test="demandsId!= null and demandsId!= ''">
+    AND DEMANDS_ID = #{demandsId}
+    </if>
+    <if test="demandsName!= null and demandsName!= ''">
+    AND DEMANDS_NAME LIKE CONCAT('%',#{demandsName},'%')
+    </if>
+    <if test="developer!= null and developer!= ''">
+    AND DEVELOPER LIKE CONCAT('%',#{developer},'%')
+    </if>
+    <if test="status!= null">
+    AND STATUS = #{status}
+    </if>
+    <if test="status == '3'">
+      AND COMPLETE_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-90,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD')
+    </if>
+</select>
+
+<update id="updateDemandsList">
+  UPDATE A1MFG.REPORTING_DEMANDS_LIST
+  SET
+  <if test="demandsName!= null and demandsName!= ''">
+  DEMANDS_NAME = #{demandsName},
+  </if>
+  <if test="demandsContent!= null and demandsContent!= ''">
+    DEMANDS_CONTENT = #{demandsContent},
+  </if>
+  <if test="rank!= null and rank!= ''">
+    "RANK" = #{rank},
+  </if>
+  <if test="demandsUser!= null and demandsUser!= ''">
+    DEMANDS_USER = #{demandsUser},
+  </if>
+  <if test="developer!= null and developer!= ''">
+    DEVELOPER = #{developer},
+  </if>
+  <if test="completionRate!= null and completionRate!= ''">
+    COMPLETION_RATE = #{completionRate},
+  </if>
+  <if test="status!= null and status!= ''">
+    STATUS = #{status},
+  </if>
+  <if test="demandsConfirmDate!= null and demandsConfirmDate!= ''">
+    DEMANDS_CONFIRM_DATE = #{demandsConfirmDate},
+  </if>
+  <if test="demandsForecastDate!= null and demandsForecastDate!= ''">
+    DEMANDS_FORECAST_DATE = #{demandsForecastDate},
+  </if>
+  <if test="startDate!= null and startDate!= ''">
+    START_DATE = #{startDate},
+  </if>
+  <if test="completeDate!= null and completeDate!= ''">
+    COMPLETE_DATE = #{completeDate},
+  </if>
+  <if test="remark!= null">
+    REMARK = #{remark},
+  </if>
+  UPDATE_TIME = SYSDATE, UPDATE_USER = #{updateUser}
+  WHERE DEMANDS_ID = #{demandsId}
+</update>
+
+<insert id="insertDemandsList">
+  INSERT INTO A1MFG.REPORTING_DEMANDS_LIST (DEMANDS_ID, DEMANDS_NAME, DEMANDS_CONTENT, "RANK", DEMANDS_USER, DEVELOPER, COMPLETION_RATE, STATUS, DEMANDS_CONFIRM_DATE
+  , DEMANDS_FORECAST_DATE, START_DATE, COMPLETE_DATE, REMARK, UPDATE_TIME, UPDATE_USER)
+  VALUES (#{demandsId,javaType=String,jdbcType=VARCHAR}, #{demandsName,javaType=String,jdbcType=VARCHAR}
+  , #{demandsContent,javaType=String,jdbcType=VARCHAR}, #{rank,javaType=_integer,jdbcType=INTEGER}, #{demandsUser,javaType=String,jdbcType=VARCHAR}
+  , #{developer,javaType=String,jdbcType=VARCHAR}, #{completionRate,javaType=String,jdbcType=VARCHAR}, #{status,javaType=String,jdbcType=VARCHAR}
+  , #{demandsConfirmDate,javaType=String,jdbcType=VARCHAR}, #{demandsForecastDate,javaType=String,jdbcType=VARCHAR}
+  , #{startDate,javaType=String,jdbcType=VARCHAR}, #{completeDate,javaType=String,jdbcType=VARCHAR}, #{remark,javaType=String,jdbcType=VARCHAR}
+  , SYSDATE, #{updateUser,javaType=String,jdbcType=VARCHAR})
+</insert>
+
+<delete id="deleteDemandsById" >
+  DELETE FROM A1MFG.REPORTING_DEMANDS_LIST  WHERE DEMANDS_ID = #{demandsId}
+</delete>
+
+  <select id="getDemandsInfoById" resultType="mfg.reporting.pojo.ReportingDemandListPO">
+    SELECT DEMANDS_ID,DEMANDS_NAME,DEMANDS_CONTENT,"RANK",DEMANDS_USER,DEVELOPER,COMPLETION_RATE,STATUS,DEMANDS_CONFIRM_DATE
+    ,DEMANDS_FORECAST_DATE,START_DATE,COMPLETE_DATE,REMARK,UPDATE_TIME,UPDATE_USER
+    FROM A1MFG.REPORTING_DEMANDS_LIST
+    where DEMANDS_ID = #{demandsId}
+  </select>
+
+  <insert id="insertDemandsListAll"  parameterType="java.util.List">
+    insert into A1MFG.REPORTING_DEMANDS_LIST
+    (DEMANDS_ID,DEMANDS_NAME,DEMANDS_CONTENT,"RANK",DEMANDS_USER,DEVELOPER,COMPLETION_RATE,STATUS,DEMANDS_CONFIRM_DATE
+    ,DEMANDS_FORECAST_DATE,START_DATE,COMPLETE_DATE,REMARK,UPDATE_TIME,UPDATE_USER)
+    values
+    <foreach collection="list" item="item" index="index" separator=",">
+      (#{item.demandsId,javaType=String,jdbcType=VARCHAR}, #{item.demandsName,javaType=String,jdbcType=VARCHAR}
+      , #{item.demandsContent,javaType=String,jdbcType=VARCHAR}, #{item.rank,javaType=_integer,jdbcType=INTEGER}, #{item.demandsUser,javaType=String,jdbcType=VARCHAR}
+      , #{item.developer,javaType=String,jdbcType=VARCHAR}, #{item.completionRate,javaType=_integer,jdbcType=VARCHAR}, #{item.status,javaType=_integer,jdbcType=VARCHAR}
+      , #{item.demandsConfirmDate,javaType=String,jdbcType=VARCHAR}, #{item.demandsForecastDate,javaType=String,jdbcType=VARCHAR}
+      , #{item.startDate,javaType=String,jdbcType=VARCHAR}, #{item.completeDate,javaType=String,jdbcType=VARCHAR}, #{item.remark,javaType=String,jdbcType=VARCHAR}
+      , SYSDATE, #{item.updateUser,javaType=String,jdbcType=VARCHAR})
+    </foreach>
+  </insert>
+
+  <select id="selectDemandsListAll" resultType="mfg.reporting.pojo.ReportingDemandListVO">
+    SELECT DEMANDS_ID demandsId,DEMANDS_NAME demandsName,DEMANDS_CONTENT demandsContent,"RANK" rank,DEMANDS_USER demandsUser,DEVELOPER developer,COMPLETION_RATE completionRate,STATUS status
+    ,DEMANDS_CONFIRM_DATE demandsConfirmDate ,DEMANDS_FORECAST_DATE demandsForCastDate
+    ,START_DATE startDate,COMPLETE_DATE completeDate,REMARK remark
+    FROM A1MFG.REPORTING_DEMANDS_LIST
+    WHERE 1=1
+  </select>
+</mapper>

@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.MitSufferMapper">
+
+    <select id="getShiftDate" resultType="java.util.Map">
+        SELECT * FROM
+        (
+        SELECT DISTINCT WEEK SHIFT_DATE,'PRE'||(RN-1)||'W' TYPE FROM
+        (
+        SELECT DISTINCT 'W'||SUBSTR(SHOP_WEEK,3,4) WEEK,SHIFT_DATE,SHOP_WEEK
+        ,DENSE_RANK() OVER(ORDER BY T.SHOP_WEEK DESC) RN
+        FROM ODS.WP_CALENDAR T WHERE T.SHIFT_DATE<![CDATA[<=]]>TO_CHAR(SYSDATE-8/24,'YYYYMMDD')
+        ) WHERE RN IN (2,3,4)
+        UNION ALL
+        SELECT DISTINCT SUBSTR(SHIFT_DATE,5,4) SHIFT_DATE,'PRE'
+        ||(ROW_NUMBER() OVER(ORDER BY SHIFT_DATE DESC))||'D' TYPE FROM
+        (SELECT DISTINCT SHIFT_DATE FROM ODS.WP_CALENDAR T WHERE T.SHIFT_DATE
+        BETWEEN TO_CHAR(SYSDATE-7.5/24-7,'YYYYMMDD') AND TO_CHAR(SYSDATE-8/24-1,'YYYYMMDD'))
+        )
+        PIVOT (
+        MAX(SHIFT_DATE) FOR TYPE IN (
+        'PRE1W' AS PRE1W,
+        'PRE2W' AS PRE2W,
+        'PRE3W' AS PRE3W,
+        'PRE1D' AS PRE1D,
+        'PRE2D' AS PRE2D,
+        'PRE3D' AS PRE3D,
+        'PRE4D' AS PRE4D,
+        'PRE5D' AS PRE5D,
+        'PRE6D' AS PRE6D,
+        'PRE7D' AS PRE7D
+        )
+        )
+    </select>
+
+    <select id="getMitAllSummary" resultType="java.util.Map">
+        SELECT '量测' TYPE,T.SHIFT_DATE,T.MOVE_RATIO_YD*100 MOVE_RATIO_YD,T.MOVE_RATIO_7D*100 MOVE_RATIO_7D,T.MOVE_RATIO_30D*100 MOVE_RATIO_30D
+        ,T.SUFFER_CT_YD,T.SUFFER_CT_7D,T.SUFFER_CT_30D
+        ,T.TTL_MOVE_YD,T.TTL_MOVE_7D,T.TTL_MOVE_30D,T.EQP_MOVE_YD,T.EQP_MOVE_7D,T.EQP_MOVE_30D,T.DYB_MOVE_YD,T.DYB_MOVE_7D
+        ,T.DYB_MOVE_30D,T.QS_RATIO_YD*100 QS_RATIO_YD,T.QS_RATIO_7D*100 QS_RATIO_7D,T.QS_RATIO_30D*100 QS_RATIO_30D
+        FROM A1MFG.MIT_SUFFER_SUMMARY T WHERE SHIFT_DATE= TO_CHAR(SYSDATE-8/24,'YYYYMMDD') AND  FAB=#{fab}
+    </select>
+
+
+    <select id="getMitSummary" resultType="java.util.Map">
+        WITH calendar_data AS (
+        SELECT DISTINCT WEEK SHIFT_DATE,'PRE'||(RN-1)||'W' TYPE FROM
+        (
+        SELECT DISTINCT 'W'||SUBSTR(SHOP_WEEK,3,4) WEEK,SHIFT_DATE,SHOP_WEEK
+        ,DENSE_RANK() OVER(ORDER BY T.SHOP_WEEK DESC) RN
+        FROM ODS.WP_CALENDAR T WHERE T.SHIFT_DATE<![CDATA[<=]]>TO_CHAR(SYSDATE-8/24,'YYYYMMDD')
+        ) WHERE RN IN (2,3,4)
+        UNION ALL
+        SELECT DISTINCT SHIFT_DATE,'PRE'
+        ||(ROW_NUMBER() OVER(ORDER BY SHIFT_DATE DESC))||'D' TYPE FROM
+        (SELECT DISTINCT SHIFT_DATE FROM ODS.WP_CALENDAR T WHERE T.SHIFT_DATE
+        BETWEEN TO_CHAR(SYSDATE-8/24-7,'YYYYMMDD') AND TO_CHAR(SYSDATE-8/24-1,'YYYYMMDD'))
+        ),
+        product_status AS (
+        SELECT 'Pilot' PRODUCT_STATUS FROM DUAL UNION ALL
+        SELECT 'M&amp;R' PRODUCT_STATUS FROM DUAL
+        ),
+        base_data AS (
+        SELECT MODULE,EQP_G,SR FROM A1MFG.MIT_SUFFER_SR
+        )
+        SELECT
+        MODULE,
+        EQP_G,
+        PRODUCT_STATUS,
+        METRIC_TYPE ITEM,
+        <![CDATA[
+         CASE WHEN PRE3W<0 THEN NULL ELSE PRE3W END PRE3W
+        ,CASE WHEN PRE2W<0 THEN NULL ELSE PRE2W END PRE2W
+        ,CASE WHEN PRE1W<0 THEN NULL ELSE PRE1W END PRE1W
+        ,CASE WHEN PRE1D<0 THEN NULL ELSE PRE1D END PRE1D
+        ,CASE WHEN PRE2D<0 THEN NULL ELSE PRE2D END PRE2D
+        ,CASE WHEN PRE3D<0 THEN NULL ELSE PRE3D END PRE3D
+        ,CASE WHEN PRE4D<0 THEN NULL ELSE PRE4D END PRE4D
+        ,CASE WHEN PRE5D<0 THEN NULL ELSE PRE5D END PRE5D
+        ,CASE WHEN PRE6D<0 THEN NULL ELSE PRE6D END PRE6D
+        ,CASE WHEN PRE7D<0 THEN NULL ELSE PRE7D END PRE7D
+        ]]>
+        FROM
+        (
+
+        SELECT T1.MODULE,T1.EQP_G,T1.PRODUCT_STATUS,T1.TYPE
+        ,'S/R Tgt(OPD)' METRIC_TYPE,T1.SR VALUE
+        FROM
+        (
+        SELECT A1.*,A2.PRODUCT_STATUS,A3.SHIFT_DATE,A3.TYPE FROM
+        base_data A1
+        ,product_status A2
+        ,calendar_data A3
+        WHERE 1=1
+        )T1
+        LEFT JOIN
+        (
+        SELECT * FROM A1MFG.MIT_SUFFER_CT WHERE FAB=#{fab}
+        ) T2
+        ON T1.EQP_G=T2.EQP_G AND T1.PRODUCT_STATUS=T2.PRODUCT_STATUS AND T1.SHIFT_DATE=T2.SHIFT_DATE
+
+
+
+        UNION ALL
+
+        SELECT T1.MODULE,T1.EQP_G,T1.PRODUCT_STATUS,T1.TYPE
+        ,'S/R(基准情报)' METRIC_TYPE,T2.SR_PSR*100 VALUE
+        FROM
+        (
+        SELECT A1.*,A2.PRODUCT_STATUS,A3.SHIFT_DATE,A3.TYPE FROM
+        base_data A1
+        ,product_status A2
+        ,calendar_data A3
+        WHERE 1=1
+        )T1
+        LEFT JOIN
+        (
+        SELECT * FROM A1MFG.MIT_SUFFER_CT WHERE FAB=#{fab}
+        ) T2
+        ON T1.EQP_G=T2.EQP_G AND T1.PRODUCT_STATUS=T2.PRODUCT_STATUS AND T1.SHIFT_DATE=T2.SHIFT_DATE
+
+
+        UNION ALL
+
+        SELECT T1.MODULE,T1.EQP_G,T1.PRODUCT_STATUS,T1.TYPE
+        ,'S/R(ACT)' METRIC_TYPE,T2.SR_ACT*100 VALUE
+        FROM
+        (
+        SELECT A1.*,A2.PRODUCT_STATUS,A3.SHIFT_DATE,A3.TYPE FROM
+        base_data A1
+        ,product_status A2
+        ,calendar_data A3
+        WHERE 1=1
+        )T1
+        LEFT JOIN
+        (
+        SELECT * FROM A1MFG.MIT_SUFFER_CT WHERE FAB=#{fab}
+        ) T2
+        ON T1.EQP_G=T2.EQP_G AND T1.PRODUCT_STATUS=T2.PRODUCT_STATUS AND T1.SHIFT_DATE=T2.SHIFT_DATE
+
+        UNION ALL
+
+        SELECT T1.MODULE,T1.EQP_G,T1.PRODUCT_STATUS,T1.TYPE
+        ,'Suffer CT' METRIC_TYPE,T2.SUFFER_CT VALUE
+        FROM
+        (
+        SELECT A1.*,A2.PRODUCT_STATUS,A3.SHIFT_DATE,A3.TYPE FROM
+        base_data A1
+        ,product_status A2
+        ,calendar_data A3
+        WHERE 1=1
+        )T1
+        LEFT JOIN
+        (
+        SELECT * FROM A1MFG.MIT_SUFFER_CT WHERE FAB=#{fab}
+        ) T2
+        ON T1.EQP_G=T2.EQP_G AND T1.PRODUCT_STATUS=T2.PRODUCT_STATUS AND T1.SHIFT_DATE=T2.SHIFT_DATE
+
+
+        )
+        PIVOT
+        (
+        MAX(VALUE) FOR TYPE IN
+        (
+        'PRE3W' AS PRE3W,
+        'PRE2W' AS PRE2W,
+        'PRE1W' AS PRE1W,
+        'PRE1D' AS PRE1D,
+        'PRE2D' AS PRE2D,
+        'PRE3D' AS PRE3D,
+        'PRE4D' AS PRE4D,
+        'PRE5D' AS PRE5D,
+        'PRE6D' AS PRE6D,
+        'PRE7D' AS PRE7D
+        )
+        )
+        ORDER BY MODULE,EQP_G,PRODUCT_STATUS DESC,
+        CASE METRIC_TYPE
+        WHEN 'S/R Tgt(OPD)' THEN 1
+        WHEN 'S/R(基准情报)' THEN 2
+        WHEN 'S/R(ACT)' THEN 3
+        WHEN 'Suffer CT' THEN 4
+        END
+
+
+    </select>
+
+    <select id="getMitSummaryNon" resultType="java.util.Map">
+        WITH calendar_data AS (
+        SELECT DISTINCT WEEK SHIFT_DATE,'PRE'||(RN-1)||'W' TYPE FROM
+        (
+        SELECT DISTINCT 'W'||SUBSTR(SHOP_WEEK,3,4) WEEK,SHIFT_DATE,SHOP_WEEK
+        ,DENSE_RANK() OVER(ORDER BY T.SHOP_WEEK DESC) RN
+        FROM ODS.WP_CALENDAR T WHERE T.SHIFT_DATE<![CDATA[<=]]>TO_CHAR(SYSDATE-8/24,'YYYYMMDD')
+        ) WHERE RN IN (2,3,4)
+        UNION ALL
+        SELECT DISTINCT SHIFT_DATE,'PRE'
+        ||(ROW_NUMBER() OVER(ORDER BY SHIFT_DATE DESC))||'D' TYPE FROM
+        (SELECT DISTINCT SHIFT_DATE FROM ODS.WP_CALENDAR T WHERE T.SHIFT_DATE
+        BETWEEN TO_CHAR(SYSDATE-8/24-7,'YYYYMMDD') AND TO_CHAR(SYSDATE-8/24-1,'YYYYMMDD'))
+        ),
+        product_status AS (
+        SELECT 'ALL' PRODUCT_STATUS FROM DUAL
+        ),
+        base_data AS (
+        SELECT MODULE,EQP_G,SR FROM A1MFG.MIT_SUFFER_SR
+        )
+        SELECT
+        MODULE,
+        EQP_G,
+        PRODUCT_STATUS,
+        METRIC_TYPE ITEM,
+        <![CDATA[
+         CASE WHEN PRE3W<0 THEN NULL ELSE PRE3W END PRE3W
+        ,CASE WHEN PRE2W<0 THEN NULL ELSE PRE2W END PRE2W
+        ,CASE WHEN PRE1W<0 THEN NULL ELSE PRE1W END PRE1W
+        ,CASE WHEN PRE1D<0 THEN NULL ELSE PRE1D END PRE1D
+        ,CASE WHEN PRE2D<0 THEN NULL ELSE PRE2D END PRE2D
+        ,CASE WHEN PRE3D<0 THEN NULL ELSE PRE3D END PRE3D
+        ,CASE WHEN PRE4D<0 THEN NULL ELSE PRE4D END PRE4D
+        ,CASE WHEN PRE5D<0 THEN NULL ELSE PRE5D END PRE5D
+        ,CASE WHEN PRE6D<0 THEN NULL ELSE PRE6D END PRE6D
+        ,CASE WHEN PRE7D<0 THEN NULL ELSE PRE7D END PRE7D
+        ]]>
+        FROM
+        (
+
+        SELECT T1.MODULE,T1.EQP_G,T1.PRODUCT_STATUS,T1.TYPE
+        ,'S/R Tgt(OPD)' METRIC_TYPE,T1.SR VALUE
+        FROM
+        (
+        SELECT A1.*,A2.PRODUCT_STATUS,A3.SHIFT_DATE,A3.TYPE FROM
+        base_data A1
+        ,product_status A2
+        ,calendar_data A3
+        WHERE 1=1
+        )T1
+        LEFT JOIN
+        (
+        SELECT * FROM A1MFG.MIT_SUFFER_CT WHERE FAB=#{fab}
+        ) T2
+        ON T1.EQP_G=T2.EQP_G AND T1.PRODUCT_STATUS=T2.PRODUCT_STATUS AND T1.SHIFT_DATE=T2.SHIFT_DATE
+
+
+
+        UNION ALL
+
+        SELECT T1.MODULE,T1.EQP_G,T1.PRODUCT_STATUS,T1.TYPE
+        ,'S/R(基准情报)' METRIC_TYPE,T2.SR_PSR*100 VALUE
+        FROM
+        (
+        SELECT A1.*,A2.PRODUCT_STATUS,A3.SHIFT_DATE,A3.TYPE FROM
+        base_data A1
+        ,product_status A2
+        ,calendar_data A3
+        WHERE 1=1
+        )T1
+        LEFT JOIN
+        (
+        SELECT * FROM A1MFG.MIT_SUFFER_CT WHERE FAB=#{fab}
+        ) T2
+        ON T1.EQP_G=T2.EQP_G AND T1.PRODUCT_STATUS=T2.PRODUCT_STATUS AND T1.SHIFT_DATE=T2.SHIFT_DATE
+
+
+        UNION ALL
+
+        SELECT T1.MODULE,T1.EQP_G,T1.PRODUCT_STATUS,T1.TYPE
+        ,'S/R(ACT)' METRIC_TYPE,T2.SR_ACT*100 VALUE
+        FROM
+        (
+        SELECT A1.*,A2.PRODUCT_STATUS,A3.SHIFT_DATE,A3.TYPE FROM
+        base_data A1
+        ,product_status A2
+        ,calendar_data A3
+        WHERE 1=1
+        )T1
+        LEFT JOIN
+        (
+        SELECT * FROM A1MFG.MIT_SUFFER_CT WHERE FAB=#{fab}
+        ) T2
+        ON T1.EQP_G=T2.EQP_G AND T1.PRODUCT_STATUS=T2.PRODUCT_STATUS AND T1.SHIFT_DATE=T2.SHIFT_DATE
+
+        UNION ALL
+
+        SELECT T1.MODULE,T1.EQP_G,T1.PRODUCT_STATUS,T1.TYPE
+        ,'Suffer CT' METRIC_TYPE,T2.SUFFER_CT VALUE
+        FROM
+        (
+        SELECT A1.*,A2.PRODUCT_STATUS,A3.SHIFT_DATE,A3.TYPE FROM
+        base_data A1
+        ,product_status A2
+        ,calendar_data A3
+        WHERE 1=1
+        )T1
+        LEFT JOIN
+        (
+        SELECT * FROM A1MFG.MIT_SUFFER_CT WHERE FAB=#{fab}
+        ) T2
+        ON T1.EQP_G=T2.EQP_G AND T1.PRODUCT_STATUS=T2.PRODUCT_STATUS AND T1.SHIFT_DATE=T2.SHIFT_DATE
+
+
+        )
+        PIVOT
+        (
+        MAX(VALUE) FOR TYPE IN
+        (
+        'PRE3W' AS PRE3W,
+        'PRE2W' AS PRE2W,
+        'PRE1W' AS PRE1W,
+        'PRE1D' AS PRE1D,
+        'PRE2D' AS PRE2D,
+        'PRE3D' AS PRE3D,
+        'PRE4D' AS PRE4D,
+        'PRE5D' AS PRE5D,
+        'PRE6D' AS PRE6D,
+        'PRE7D' AS PRE7D
+        )
+        )
+        ORDER BY MODULE,EQP_G,PRODUCT_STATUS DESC,
+        CASE METRIC_TYPE
+        WHEN 'S/R Tgt(OPD)' THEN 1
+        WHEN 'S/R(基准情报)' THEN 2
+        WHEN 'S/R(ACT)' THEN 3
+        WHEN 'Suffer CT' THEN 4
+        END
+
+
+    </select>
+</mapper>

@@ -1,0 +1,962 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.RmsMonitorMapper">
+
+    <resultMap id="RmsMapMonitorDetailsMap" type="mfg.reporting.pojo.RMSMonitorDetailsPO">
+        <result property="tech" column="TECH"/>
+        <result property="prodg1" column="PRODG1"/>
+        <result property="module" column="MODULE"/>
+        <result property="moduleOwner" column="MODULE_OWNER"/>
+        <result property="eqpId" column="EQP_ID"/>
+        <result property="ppName" column="PP_NAME"/>
+        <result property="opeNo" column="OPE_NO"/>
+        <result property="productStatus" column="PRODUCT_STATUS"/>
+        <result property="prodspecId" column="PRODSPEC_ID"/>
+        <result property="curWip" column="CUR_WIP"/>
+        <result property="wipClose3d" column="WIP_CLOSE_3D"/>
+        <result property="trackComment" column="TRACK_COMMENT"/>
+        <result property="scannerComment" column="SCANNER_COMMENT"/>
+        <result property="recipeComment" column="RECIPE_COMMENT"/>
+        <result property="summaryComment" column="SUMMARY_COMMENT"/>
+        <result property="eqpg" column="EQP_G"></result>
+        <result property="chamberRule" column="CHAMBER_RULE"></result>
+        <result property="wip" column="WIP"></result>
+        <result property="ec" column="EC"/>
+    </resultMap>
+
+
+    <select id="selectRmsMonitorData" resultType="map">
+        WITH BASE_INFO_DETAILS AS(
+        SELECT TECH,MODULE
+        ,SUM(DOWNLOAD_FLAG)DOWNLOAD_COUNT
+        ,SUM(INHIBIT_FLAG)INHIBIT_COUNT
+        ,SUM(TIME_FLAG)TIME_COUNT
+        ,SUM(ECSET_DOWNLOAD_FLAG)ECSET_DOWNLOAD_COUNT
+        ,SUM(ECSET_FLAG)ECSET_COUNT
+        FROM(
+        SELECT
+        TECH,PRODG1,MODULE ,EQP_ID
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND DOWNLOAD_FLAG = 'Y' THEN 1 END DOWNLOAD_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND STATUS_FLAG = 'Y' THEN 1 END INHIBIT_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND TIME_FLAG = 'Y' THEN 1 END TIME_FLAG
+        ,CASE WHEN CHECK_ECSET_ENABLED = 'Y' AND ECSET_STATUS IS NULL THEN 1 END ECSET_DOWNLOAD_FLAG
+        ,CASE WHEN CHECK_ECSET_ENABLED = 'Y' AND ECSET_STATUS &lt;&gt;'A' THEN 1 END ECSET_FLAG
+        FROM A1_MFG.RMS_MONITOR_DETAILS
+        WHERE INSTR(PP_NAME,';') = 0
+        )GROUP BY TECH,MODULE
+        ),BASE_INFO_DETAILS2 AS(
+        SELECT TECH,MODULE
+        ,SUM(TRACK_DOWNLOAD_FLAG)TRACK_DOWNLOAD_COUNT
+        ,SUM(TRACK_INHIBIT_FLAG)TRACK_INHIBIT_COUNT
+        ,SUM(TRACK_TIME_FLAG)TRACK_TIME_COUNT
+        ,SUM(SCANNER_DOWNLOAD_FLAG)SCANNER_DOWNLOAD_COUNT
+        ,SUM(SCANNER_INHIBIT_FLAG)SCANNER_INHIBIT_COUNT
+        ,SUM(SCANNER_TIME_FLAG)SCANNER_TIME_COUNT
+        ,SUM(ECSET_DOWNLOAD_FLAG)ECSET_DOWNLOAD_COUNT
+        ,SUM(ECSET_FLAG)ECSET_COUNT
+        FROM(
+        SELECT
+        TECH,PRODG1,MODULE ,EQP_ID
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND SUBSTR(DOWNLOAD_FLAG,1,1) = 'Y' THEN 1 END TRACK_DOWNLOAD_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND SUBSTR(STATUS_FLAG,1,1) = 'Y' THEN 1 END TRACK_INHIBIT_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND SUBSTR(TIME_FLAG,1,1) = 'Y' THEN 1 END TRACK_TIME_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND SUBSTR(DOWNLOAD_FLAG,2,1) = 'Y' THEN 1 END SCANNER_DOWNLOAD_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND SUBSTR(STATUS_FLAG,2,1) = 'Y' THEN 1 END SCANNER_INHIBIT_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND SUBSTR(TIME_FLAG,2,1) = 'Y' THEN 1 END SCANNER_TIME_FLAG
+        ,CASE WHEN CHECK_ECSET_ENABLED = 'Y' AND ECSET_STATUS IS NULL THEN 1 END ECSET_DOWNLOAD_FLAG
+        ,CASE WHEN CHECK_ECSET_ENABLED = 'Y' AND ECSET_STATUS &lt;&gt;'A' THEN 1 END ECSET_FLAG
+        FROM A1_MFG.RMS_MONITOR_DETAILS
+        WHERE INSTR(PP_NAME,';') &gt; 0
+        )GROUP BY TECH,MODULE
+        )
+        SELECT TECH, MODULE,ITEM, TOTAL_COUNT
+        FROM BASE_INFO_DETAILS
+        UNPIVOT (
+        TOTAL_COUNT FOR ITEM IN (DOWNLOAD_COUNT AS 'Recipe 未建', INHIBIT_COUNT AS 'Recipe 不可用', TIME_COUNT AS 'Recipe 过期',ECSET_DOWNLOAD_COUNT AS'EC 未建',ECSET_COUNT AS 'EC 不可用')
+        )
+        UNION ALL
+        SELECT TECH, MODULE,ITEM, TOTAL_COUNT
+        FROM BASE_INFO_DETAILS2
+        UNPIVOT (
+        TOTAL_COUNT FOR ITEM IN (TRACK_DOWNLOAD_COUNT AS 'Track 未建', TRACK_INHIBIT_COUNT AS 'Track 不可用', TRACK_TIME_COUNT AS 'Track 过期'
+        ,SCANNER_DOWNLOAD_COUNT AS 'Scanner 未建', SCANNER_INHIBIT_COUNT AS 'Scanner 不可用', SCANNER_TIME_COUNT AS 'Scanner 过期'
+        ,ECSET_DOWNLOAD_COUNT AS'EC 未建',ECSET_COUNT AS 'EC 不可用')
+        )
+    </select>
+
+
+    <select id="selectRmsSummaryData" resultType="map">
+        WITH BASE_INFO_DETAILS AS(
+        SELECT TECH,MODULE
+        ,SUM(DOWNLOAD_FLAG)DOWNLOAD_COUNT
+        ,SUM(INHIBIT_FLAG)INHIBIT_COUNT
+        ,SUM(TIME_FLAG)TIME_COUNT
+        ,SUM(ECSET_DOWNLOAD_FLAG)ECSET_DOWNLOAD_COUNT
+        ,SUM(ECSET_INHIBIT_FLAG)ECSET_INHIBIT_COUNT
+        FROM(
+        SELECT DISTINCT
+        TECH,PRODG1,MODULE ,EQP_ID,PP_NAME,OPE_NO
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND DOWNLOAD_FLAG = 'Y' THEN 1 ELSE 0 END DOWNLOAD_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND STATUS_FLAG = 'Y' THEN 1 ELSE 0 END INHIBIT_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND TIME_FLAG = 'Y' THEN 1 ELSE 0 END TIME_FLAG
+        ,CASE WHEN CHECK_ECSET_ENABLED = 'Y' AND ECSET_STATUS IS NULL THEN 1 ELSE 0 END ECSET_DOWNLOAD_FLAG
+        ,CASE WHEN CHECK_ECSET_ENABLED = 'Y' AND ECSET_STATUS &lt;&gt;'A' THEN 1 ELSE 0 END ECSET_INHIBIT_FLAG
+        FROM
+        <if test="fab == 'N1A3'">
+            A1_MFG.A3_RMS_MONITOR_DETAILS
+        </if>
+        <if test="fab == 'N1A1'">
+            A1_MFG.RMS_MONITOR_DETAILS
+        </if>
+        WHERE INSTR(PP_NAME,';') = 0
+        <foreach collection="productStatusList" item="productStatus" open="AND PRODUCT_STATUS IN(" separator="," close=")">#{productStatus}</foreach>
+        )GROUP BY TECH,MODULE
+        ),BASE_INFO_DETAILS2 AS(
+        SELECT  TECH,MODULE
+        ,SUM(DOWNLOAD_FLAG)DOWNLOAD_COUNT
+        ,SUM(INHIBIT_FLAG)INHIBIT_COUNT
+        ,SUM(TIME_FLAG)TIME_COUNT
+        ,SUM(ECSET_DOWNLOAD_FLAG)ECSET_DOWNLOAD_COUNT
+        ,SUM(ECSET_INHIBIT_FLAG)ECSET_INHIBIT_COUNT
+        FROM(
+        SELECT DISTINCT
+        TECH,PRODG1,MODULE ,EQP_ID,PP_NAME,OPE_NO
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND DOWNLOAD_FLAG &lt;&gt; 'NN' THEN 1 ELSE 0 END DOWNLOAD_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND STATUS_FLAG &lt;&gt;'NN' THEN 1 ELSE 0 END INHIBIT_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND TIME_FLAG &lt;&gt; 'NN' THEN 1 ELSE 0 END TIME_FLAG
+        ,CASE WHEN CHECK_ECSET_ENABLED = 'Y' AND ECSET_STATUS IS NULL THEN 1 ELSE 0 END ECSET_DOWNLOAD_FLAG
+        ,CASE WHEN CHECK_ECSET_ENABLED = 'Y' AND ECSET_STATUS &lt;&gt;'A' THEN 1 ELSE 0 END ECSET_INHIBIT_FLAG
+        FROM
+        <if test="fab == 'N1A3'">
+            A1_MFG.A3_RMS_MONITOR_DETAILS
+        </if>
+        <if test="fab == 'N1A1'">
+            A1_MFG.RMS_MONITOR_DETAILS
+        </if>
+        WHERE INSTR(PP_NAME,';') &gt; 0
+        <foreach collection="productStatusList" item="productStatus" open="AND PRODUCT_STATUS IN(" separator="," close=")">#{productStatus}</foreach>
+        )GROUP BY TECH,MODULE
+        )
+        SELECT TECH
+        ,SUM(DOWNLOAD_COUNT)DOWNLOAD_COUNT
+        ,SUM(INHIBIT_COUNT)INHIBIT_COUNT
+        ,SUM(TIME_COUNT)TIME_COUNT
+        ,SUM(ECSET_DOWNLOAD_COUNT)ECSET_DOWNLOAD_COUNT
+        ,SUM(ECSET_INHIBIT_COUNT)ECSET_INHIBIT_COUNT
+        ,SUM(DOWNLOAD_COUNT + INHIBIT_COUNT + TIME_COUNT + ECSET_DOWNLOAD_COUNT + ECSET_INHIBIT_COUNT) AS TOTAL_COUNT
+        FROM(
+        SELECT TECH,MODULE,DOWNLOAD_COUNT,INHIBIT_COUNT,TIME_COUNT,ECSET_DOWNLOAD_COUNT,ECSET_INHIBIT_COUNT
+        FROM BASE_INFO_DETAILS
+        UNION ALL
+        SELECT TECH,MODULE,DOWNLOAD_COUNT,INHIBIT_COUNT,TIME_COUNT,ECSET_DOWNLOAD_COUNT,ECSET_INHIBIT_COUNT
+        FROM BASE_INFO_DETAILS2
+        )GROUP BY TECH
+        ORDER BY TECH
+    </select>
+
+    <select id="getRmsSummaryTableData" resultType="map">
+        <![CDATA[
+        WITH BASE_INFO_DETAILS AS(
+        SELECT TECH
+        ,SUM(DOWNLOAD_FLAG)DOWNLOAD_COUNT
+        ,SUM(INHIBIT_FLAG)INHIBIT_COUNT
+        ,SUM(TIME_FLAG)TIME_COUNT
+        ,SUM(ECSET_DOWNLOAD_FLAG)ECSET_DOWNLOAD_COUNT
+        ,SUM(ECSET_INHIBIT_COUNT)ECSET_INHIBIT_COUNT
+        FROM(
+        SELECT DISTINCT
+        TECH,PRODG1,MODULE
+        ,EQP_ID || DECODE(CHAMBER,NULL,NULL,'.')||
+        CASE WHEN INSTR(CHAMBER,';')>0 THEN SUBSTR(CHAMBER,1,INSTR(CHAMBER,';')-1) ELSE CHAMBER END EQP_ID
+        ,PP_NAME,OPE_NO
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND DOWNLOAD_FLAG = 'Y' THEN 1 END DOWNLOAD_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND STATUS_FLAG = 'Y' THEN 1 END INHIBIT_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND TIME_FLAG = 'Y' THEN 1 END TIME_FLAG
+        ,CASE WHEN CHECK_ECSET_ENABLED = 'Y' AND ECSET_STATUS IS NULL THEN 1 END ECSET_DOWNLOAD_FLAG
+        ,CASE WHEN CHECK_ECSET_ENABLED = 'Y' AND ECSET_STATUS <>'A' THEN 1 END ECSET_INHIBIT_COUNT
+        FROM (
+        SELECT A.*,REGEXP_REPLACE(REGEXP_REPLACE(CHAMBER_RULE, '[^a-zA-Z0-9|&_-]', ''),'[|&]',';')CHAMBER
+        FROM
+                ]]>
+        <if test="fab == 'N1A3'">
+            A1_MFG.A3_RMS_MONITOR_DETAILS A
+        </if>
+        <if test="fab == 'N1A1'">
+            A1_MFG.RMS_MONITOR_DETAILS A
+        </if>
+        ) A
+        WHERE INSTR(PP_NAME,';') = 0 AND MODULE = #{module}
+        )A
+        <if test="eqpg != null and eqpg.size() > 0">
+            WHERE  EXISTS(
+             SELECT 1 FROM(
+            SELECT EQP_ID FROM
+            <if test="fab == 'N1A3'">
+                PWEB.EQP_ID_USE_STD@A3PDW
+            </if>
+            <if test="fab == 'N1A1'">
+                PWEB.EQP_ID_USE_STD@A1PDW
+            </if>
+            WHERE 1=1 AND
+            <foreach collection="eqpg" item="eqp" open="(" separator="OR" close=")">EQP_G = #{eqp}</foreach>
+            )B WHERE A.EQP_ID = B.EQP_ID
+            )
+          </if>
+        GROUP BY TECH
+        ),
+        <![CDATA[
+        BASE_INFO_DETAILS2 AS(
+        SELECT TECH
+        ,SUM(TRACK_DOWNLOAD_FLAG)TRACK_DOWNLOAD_COUNT
+        ,SUM(TRACK_INHIBIT_FLAG)TRACK_INHIBIT_COUNT
+        ,SUM(TRACK_TIME_FLAG)TRACK_TIME_COUNT
+        ,SUM(SCANNER_DOWNLOAD_FLAG)SCANNER_DOWNLOAD_COUNT
+        ,SUM(SCANNER_INHIBIT_FLAG)SCANNER_INHIBIT_COUNT
+        ,SUM(SCANNER_TIME_FLAG)SCANNER_TIME_COUNT
+        ,SUM(ECSET_DOWNLOAD_FLAG)ECSET_DOWNLOAD_COUNT
+        ,SUM(ECSET_INHIBIT_COUNT)ECSET_INHIBIT_COUNT
+        FROM(
+        SELECT DISTINCT
+        TECH,PRODG1,MODULE
+        ,EQP_ID || DECODE(CHAMBER,NULL,NULL,'.')||
+        CASE WHEN INSTR(CHAMBER,';')>0 THEN SUBSTR(CHAMBER,1,INSTR(CHAMBER,';')-1) ELSE CHAMBER END EQP_ID
+        ,PP_NAME,OPE_NO
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND SUBSTR(DOWNLOAD_FLAG,1,1) = 'Y' THEN 1 END TRACK_DOWNLOAD_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND SUBSTR(STATUS_FLAG,1,1) = 'Y' THEN 1 END TRACK_INHIBIT_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND SUBSTR(TIME_FLAG,1,1) = 'Y' THEN 1 END TRACK_TIME_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND SUBSTR(DOWNLOAD_FLAG,2,1) = 'Y' THEN 1 END SCANNER_DOWNLOAD_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND SUBSTR(STATUS_FLAG,2,1) = 'Y' THEN 1 END SCANNER_INHIBIT_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND SUBSTR(TIME_FLAG,2,1) = 'Y' THEN 1 END SCANNER_TIME_FLAG
+        ,CASE WHEN CHECK_ECSET_ENABLED = 'Y' AND ECSET_STATUS IS NULL THEN 1 END ECSET_DOWNLOAD_FLAG
+        ,CASE WHEN CHECK_ECSET_ENABLED = 'Y' AND ECSET_STATUS <>'A' THEN 1 END ECSET_INHIBIT_COUNT
+        FROM (
+        SELECT A.*,REGEXP_REPLACE(REGEXP_REPLACE(CHAMBER_RULE, '[^a-zA-Z0-9|&_-]', ''),'[|&]',';')CHAMBER
+         FROM
+        ]]>
+          <if test="fab == 'N1A3'">
+            A1_MFG.A3_RMS_MONITOR_DETAILS A
+        </if>
+        <if test="fab == 'N1A1'">
+            A1_MFG.RMS_MONITOR_DETAILS A
+        </if>
+         ) A
+        WHERE INSTR(PP_NAME,';') > 0  AND MODULE =  #{module}
+        ) A
+        <if test="eqpg != null and eqpg.size() > 0">
+            WHERE  EXISTS(
+             SELECT 1 FROM(
+            SELECT EQP_ID FROM
+            <if test="fab == 'N1A3'">
+                PWEB.EQP_ID_USE_STD@A3PDW
+            </if>
+            <if test="fab == 'N1A1'">
+                PWEB.EQP_ID_USE_STD@A1PDW
+            </if>
+            WHERE 1=1 AND
+            <foreach collection="eqpg" item="eqp" open="(" separator="OR" close=")">EQP_G = #{eqp}</foreach>
+            )B WHERE A.EQP_ID = B.EQP_ID
+            )
+          </if>
+        GROUP BY TECH
+        )
+        SELECT * FROM(
+        SELECT TECH
+        ,NVL(SUM(TRACK_DOWNLOAD_COUNT),0)TRACK_DOWNLOAD_COUNT
+        ,NVL(SUM(TRACK_INHIBIT_COUNT),0)TRACK_INHIBIT_COUNT
+        ,NVL(SUM(TRACK_TIME_COUNT),0)TRACK_TIME_COUNT
+        ,NVL(SUM(SCANNER_DOWNLOAD_COUNT),0)SCANNER_DOWNLOAD_COUNT
+        ,NVL(SUM(SCANNER_INHIBIT_COUNT),0)SCANNER_INHIBIT_COUNT
+        ,NVL(SUM(SCANNER_TIME_COUNT),0)SCANNER_TIME_COUNT
+        ,NVL(SUM(DOWNLOAD_COUNT),0)DOWNLOAD_COUNT
+        ,NVL(SUM(INHIBIT_COUNT),0)INHIBIT_COUNT
+        ,NVL(SUM(TIME_COUNT),0)TIME_COUNT
+        ,NVL(SUM(ECSET_DOWNLOAD_COUNT),0)ECSET_DOWNLOAD_COUNT
+        ,NVL(SUM(ECSET_INHIBIT_COUNT),0)ECSET_INHIBIT_COUNT
+        ,NVL(SUM(NVL(TRACK_DOWNLOAD_COUNT,0)+NVL(TRACK_INHIBIT_COUNT,0)+NVL(TRACK_TIME_COUNT,0)+NVL(SCANNER_DOWNLOAD_COUNT,0)+NVL(SCANNER_INHIBIT_COUNT,0)+NVL(SCANNER_TIME_COUNT,0)+NVL(DOWNLOAD_COUNT,0)+NVL(INHIBIT_COUNT,0)+NVL(TIME_COUNT,0)+NVL(ECSET_DOWNLOAD_COUNT,0)+NVL(ECSET_INHIBIT_COUNT,0)),0)TOTAL_COUNT
+        FROM(
+        SELECT TECH,0 TRACK_DOWNLOAD_COUNT,0 TRACK_INHIBIT_COUNT,0 TRACK_TIME_COUNT,0 SCANNER_DOWNLOAD_COUNT,0 SCANNER_INHIBIT_COUNT,0 SCANNER_TIME_COUNT,DOWNLOAD_COUNT,INHIBIT_COUNT,TIME_COUNT,ECSET_DOWNLOAD_COUNT,ECSET_INHIBIT_COUNT
+        FROM BASE_INFO_DETAILS
+        UNION ALL
+        SELECT TECH,TRACK_DOWNLOAD_COUNT,TRACK_INHIBIT_COUNT,TRACK_TIME_COUNT,SCANNER_DOWNLOAD_COUNT,SCANNER_INHIBIT_COUNT,SCANNER_TIME_COUNT,0 DOWNLOAD_COUNT,0 INHIBIT_COUNT,0 TIME_COUNT,ECSET_DOWNLOAD_COUNT,ECSET_INHIBIT_COUNT
+        FROM BASE_INFO_DETAILS2
+        )A
+        GROUP BY TECH
+        )ORDER BY TOTAL_COUNT DESC
+
+    </select>
+
+
+    <select id="getRmsDetailTableData" resultMap="RmsMapMonitorDetailsMap">
+        <![CDATA[
+        WITH BASE_INFO AS (
+        SELECT C.*,D.EQP_G FROM(
+        SELECT DISTINCT
+        TECH,PRODG1,MODULE,MODULE_OWNER ,EQP_ID,CHAMBER_RULE,PP_NAME,PRODUCT_STATUS
+        ,SUBSTR(PRODSPEC_ID,1,INSTR(PRODSPEC_ID,'.')-1) AS PRODSPEC_ID
+        ,CUR_WIP,WIP_CLOSE_3D,ECSET_STATUS,OPE_NO,SUM(WIP)OVER(PARTITION BY PRODG1,OPE_NO)WIP
+        ,EQP_ID || DECODE(CHAMBER,NULL,NULL,'.')||
+        CASE WHEN INSTR(CHAMBER,';')>0 THEN SUBSTR(CHAMBER,1,INSTR(CHAMBER,';')-1) ELSE CHAMBER END EQP_CHAMBER
+        ,CASE WHEN INSTR(PP_NAME,';') > 0 AND SUBSTR(DOWNLOAD_FLAG,1,1) = 'Y' THEN 1 END TRACK_DOWNLOAD_FLAG
+        ,CASE WHEN INSTR(PP_NAME,';') > 0 AND SUBSTR(DOWNLOAD_FLAG,2,1) = 'Y' THEN 1 END SCANNER_DOWNLOAD_FLAG
+        ,CASE WHEN INSTR(PP_NAME,';') > 0 AND SUBSTR(STATUS_FLAG,1,1) = 'Y' THEN 1 END TRACK_INHIBIT_FLAG
+        ,CASE WHEN INSTR(PP_NAME,';') > 0 AND SUBSTR(STATUS_FLAG,2,1) = 'Y' THEN 1 END SCANNER_INHIBIT_FLAG
+        ,CASE WHEN INSTR(PP_NAME,';') > 0 AND SUBSTR(TIME_FLAG,1,1) = 'Y' THEN 1 END TRACK_TIME_FLAG
+        ,CASE WHEN INSTR(PP_NAME,';') > 0 AND SUBSTR(TIME_FLAG,2,1) = 'Y' THEN 1 END SCANNER_TIME_FLAG
+        ,CASE WHEN INSTR(PP_NAME,';') = 0 AND DOWNLOAD_FLAG = 'Y' THEN 1 END RECIPE_DOWNLOAD_FLAG
+        ,CASE WHEN INSTR(PP_NAME,';') = 0 AND STATUS_FLAG = 'Y' THEN 1 END RECIPE_INHIBIT_FLAG
+        ,CASE WHEN INSTR(PP_NAME,';') = 0 AND TIME_FLAG = 'Y' THEN 1 END RECIPE_TIME_FLAG
+        ,CASE WHEN INSTR(DOWNLOAD_FLAG,'Y')>0 THEN 1 END SUMMARY_DOWNLOAD_FLAG
+        ,CASE WHEN INSTR(STATUS_FLAG,'Y')>0 THEN 1 END SUMMARY_INHIBIT_FLAG
+        ,CASE WHEN INSTR(TIME_FLAG,'Y')>0 THEN 1 END SUMMARY_TIME_FLAG
+        FROM (
+        SELECT A.*,REGEXP_REPLACE(REGEXP_REPLACE(A.CHAMBER_RULE, '[^a-zA-Z0-9|&_-]', ''),'[|&]',';')CHAMBER
+        ,B.WIP
+        FROM
+        ]]>
+        <if test="fab == 'N1A3'">
+            A1_MFG.A3_RMS_MONITOR_DETAILS A
+        </if>
+        <if test="fab == 'N1A1'">
+            A1_MFG.RMS_MONITOR_DETAILS A
+        </if>
+        LEFT JOIN (
+        SELECT PRODSPEC_ID,OPE_NO,SUM(WAFER_QTY) WIP
+        FROM
+        <if test="fab == 'N1A3'">
+            ODS.LOT@A3PDW
+        </if>
+        <if test="fab == 'N1A1'">
+            ODS.LOT@A1PDW
+        </if>
+        WHERE LOT_INV_STATE = 'OnFloor' AND NENG_FLAG =1 AND PW_FLAG = 1
+        GROUP BY PRODSPEC_ID,OPE_NO
+        )B ON A.OPE_NO = B.OPE_NO AND A.PRODSPEC_ID = B.PRODSPEC_ID
+        ) A
+        WHERE TECH = #{tech,jdbcType=VARCHAR}
+        <foreach collection="productStatusList" item="productStatus" open="AND PRODUCT_STATUS IN(" separator="," close=")">#{productStatus}</foreach>
+
+        <if test="module != 'summary'">
+            AND MODULE = #{module,jdbcType=VARCHAR}
+        </if>
+
+        <if test="module == 'PHOTO'">
+            <if test="type == 'trackDownload'">
+                AND INSTR(PP_NAME,';') &gt; 0 AND SUBSTR(DOWNLOAD_FLAG,1,1) = 'Y'
+            </if>
+            <if test="type == 'scannerDownload'">
+                AND INSTR(PP_NAME,';') &gt; 0 AND SUBSTR(DOWNLOAD_FLAG,2,1) = 'Y'
+            </if>
+            <if test="type == 'trackInhibit'">
+                AND INSTR(PP_NAME,';') &gt; 0 AND SUBSTR(STATUS_FLAG,1,1) = 'Y'
+            </if>
+            <if test="type == 'scannerInhibit'">
+                AND INSTR(PP_NAME,';') &gt; 0 AND SUBSTR(STATUS_FLAG,2,1) = 'Y'
+            </if>
+            <if test="type == 'trackTime'">
+                AND INSTR(PP_NAME,';') &gt; 0 AND SUBSTR(TIME_FLAG,1,1) = 'Y'
+            </if>
+            <if test="type == 'scannerTime'">
+                AND INSTR(PP_NAME,';') &gt; 0 AND SUBSTR(TIME_FLAG,2,1) = 'Y'
+            </if>
+            <if test="type == 'ecDownload'">
+                AND INSTR(PP_NAME,';') &gt; 0 AND ECSET_STATUS IS NULL
+            </if>
+            <if test="type == 'ecInhibit'">
+                AND INSTR(PP_NAME,';') &gt; 0 AND ECSET_STATUS IS NOT NULL AND ECSET_STATUS &lt;&gt;'A'
+            </if>
+            <if test="type == 'recipeDownload'">
+                AND INSTR(PP_NAME,';') = 0 AND DOWNLOAD_FLAG = 'Y'
+            </if>
+            <if test="type == 'recipeInhibit'">
+                AND INSTR(PP_NAME,';') = 0 AND STATUS_FLAG = 'Y'
+            </if>
+            <if test="type == 'recipeTime'">
+                AND INSTR(PP_NAME,';') = 0 AND TIME_FLAG = 'Y'
+            </if>
+        </if>
+        <if test="module != 'PHOTO'">
+            <if test="type == 'recipeDownload'">
+                 AND INSTR(DOWNLOAD_FLAG,'Y')&gt;0
+            </if>
+            <if test="type == 'recipeInhibit'">
+                AND INSTR(STATUS_FLAG,'Y')&gt;0
+            </if>
+            <if test="type == 'recipeTime'">
+                AND INSTR(TIME_FLAG,'Y')&gt;0
+            </if>
+            <if test="type == 'ecDownload'">
+                AND ECSET_STATUS IS NULL
+            </if>
+            <if test="type == 'ecInhibit'">
+                AND ECSET_STATUS IS NOT NULL AND ECSET_STATUS &lt;&gt;'A'
+            </if>
+        </if>
+        )C LEFT JOIN
+        <if test="fab == 'N1A3'">
+            PWEB.EQP_ID_USE_STD@A3PDW D
+        </if>
+        <if test="fab == 'N1A1'">
+            PWEB.EQP_ID_USE_STD@A1PDW D
+        </if>
+        ON C.EQP_CHAMBER = D.EQP_ID
+        <if test="eqpg != null and eqpg.size() &gt; 0">
+           WHERE 1=1 AND
+            <foreach collection="eqpg" item="eqp" open="(" separator="OR" close=")">EQP_G = #{eqp}</foreach>
+        </if>
+        )
+        SELECT
+        TECH,PRODG1,MODULE,MODULE_OWNER,EQP_ID,PP_NAME,PRODUCT_STATUS,CUR_WIP,WIP_CLOSE_3D,OPE_NO,PRODSPEC_ID
+        ,EQP_G,CHAMBER_RULE,WIP
+        ,DECODE(TRACK_DOWNLOAD_FLAG,1,'未建') || CASE WHEN TRACK_DOWNLOAD_FLAG = 1 AND TRACK_INHIBIT_FLAG = 1 THEN '/' END
+        || DECODE(TRACK_INHIBIT_FLAG,1,'不可用')|| CASE WHEN TRACK_INHIBIT_FLAG = 1 AND TRACK_TIME_FLAG = 1 THEN '/' END
+        || DECODE(TRACK_TIME_FLAG,1,'过期')
+        TRACK_COMMENT
+        ,DECODE(SCANNER_DOWNLOAD_FLAG,1,'未建') || CASE WHEN SCANNER_DOWNLOAD_FLAG = 1 AND SCANNER_INHIBIT_FLAG = 1 THEN '/' END
+        || DECODE(SCANNER_INHIBIT_FLAG,1,'不可用')|| CASE WHEN SCANNER_INHIBIT_FLAG = 1 AND SCANNER_TIME_FLAG = 1 THEN '/' END
+        || DECODE(SCANNER_TIME_FLAG,1,'过期')
+        SCANNER_COMMENT
+        ,DECODE(RECIPE_DOWNLOAD_FLAG,1,'未建') || CASE WHEN RECIPE_DOWNLOAD_FLAG = 1 AND RECIPE_INHIBIT_FLAG = 1 THEN '/' END
+        || DECODE(RECIPE_INHIBIT_FLAG,1,'不可用')|| CASE WHEN RECIPE_INHIBIT_FLAG = 1 AND RECIPE_TIME_FLAG = 1 THEN '/' END
+        || DECODE(RECIPE_TIME_FLAG,1,'过期')
+        RECIPE_COMMENT
+        ,DECODE(SUMMARY_DOWNLOAD_FLAG,1,'未建') || CASE WHEN SUMMARY_DOWNLOAD_FLAG = 1 AND SUMMARY_INHIBIT_FLAG = 1 THEN '/' END
+        || DECODE(SUMMARY_INHIBIT_FLAG,1,'不可用')|| CASE WHEN SUMMARY_INHIBIT_FLAG = 1 AND SUMMARY_TIME_FLAG = 1 THEN '/' END
+        || DECODE(SUMMARY_TIME_FLAG,1,'过期')
+        SUMMARY_COMMENT
+        ,CASE WHEN ECSET_STATUS IS NULL THEN '未建'
+        WHEN ECSET_STATUS &lt;&gt;'A' THEN '不可用' END EC
+        FROM BASE_INFO
+        order by cur_wip desc,nvl(WIP_CLOSE_3D,0) desc,decode(product_status,'Producttion',1,'Risk',2,'Pilot',3)
+    </select>
+
+    <select id="geteqpGByModule" resultType="mfg.reporting.dto.CommonSelectDTO">
+        SELECT DISTINCT EQP_G AS value, EQP_G AS label
+        FROM
+        <if test="fab == 'N1A1'">
+            PWEB.EQP_ID_USE_STD
+        </if>
+        <if test="fab == 'N1A3'">
+            PWEB.EQP_ID_USE_STD_A3
+        </if>
+        WHERE MODULE = #{module} AND ACTIVE_FLAG = 'Y'
+        ORDER BY EQP_G
+    </select>
+
+    <select id="getRmsDetailByEQPRecipe" resultType="map">
+        WITH BASE_INFO AS(
+        SELECT EQP_ID,PP_NAME,MAX(CHECK_PPID_ENABLED)CHECK_PPID_ENABLED,MAX(CHECK_ECSET_ENABLED)CHECK_ECSET_ENABLED
+        ,SUM(CASE WHEN RN=1 THEN 1 ELSE 0 END)OPE_COUNT
+        ,SUM(SUFFIX_WIP)WIP
+        ,SUM(WIP_CLOSE_3D)CLOSE_WIP
+        ,REPLACE(TRIM(MAX(DOWNLOAD_FLAG)||' '||MAX(INHIBIT_FLAG)||' '||MAX(TIME_FLAG)||' '||MAX(ECSET_DOWNLOAD_FLAG)||' '||MAX(ECSET_INHIBIT_FLAG)),' ','/') F_COMMENT
+        ,SUM(CUR_WIP)CUR_WIP
+        FROM(
+        SELECT DISTINCT
+        PRODG1,MODULE,OPE_NO,EQP_ID,PP_NAME,SUFFIX_WIP,CHECK_ECSET_ENABLED,CHECK_PPID_ENABLED
+        ,DOWNLOAD_FLAG,INHIBIT_FLAG,TIME_FLAG,ECSET_DOWNLOAD_FLAG,ECSET_INHIBIT_FLAG,WIP_CLOSE_3D
+        ,CASE WHEN RN = 1 THEN CUR_WIP END CUR_WIP
+        ,ROW_NUMBER()OVER(PARTITION BY PRODG1,OPE_NO,EQP_ID,PP_NAME ORDER BY MODULE)RN
+        FROM(
+        SELECT  A.PRODG1,A.MODULE,A.OPE_NO,A.EQP_ID,A.PP_NAME,A.CHECK_PPID_ENABLED,A.CHECK_ECSET_ENABLED
+        ,SUM(B.CUR_WIP)OVER(PARTITION BY A.PRODG1,A.OPE_NO)SUFFIX_WIP
+        ,A.CUR_WIP
+        ,ROW_NUMBER()OVER(PARTITION BY A.PRODG1,A.EQP_ID,A.PP_NAME ORDER BY A.OPE_NO)RN
+        ,A.WIP_CLOSE_3D
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND
+        ((INSTR(PP_NAME,';')=0 AND DOWNLOAD_FLAG = 'Y') OR (INSTR(PP_NAME,';')&gt;0 AND DOWNLOAD_FLAG &lt;&gt; 'NN'))
+        THEN '未建'  ELSE '' END DOWNLOAD_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND
+        ((INSTR(PP_NAME,';')=0 AND STATUS_FLAG = 'Y') OR (INSTR(PP_NAME,';')&gt;0 AND STATUS_FLAG &lt;&gt; 'NN'))
+        THEN '不可用' ELSE '' END INHIBIT_FLAG
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y' AND
+        ((INSTR(PP_NAME,';')=0 AND TIME_FLAG = 'Y') OR (INSTR(PP_NAME,';')&gt;0 AND TIME_FLAG &lt;&gt; 'NN')) THEN '过期' ELSE '' END TIME_FLAG
+        ,CASE WHEN CHECK_ECSET_ENABLED = 'Y' AND ECSET_STATUS IS NULL THEN 'EC 未建' ELSE '' END ECSET_DOWNLOAD_FLAG
+        ,CASE WHEN CHECK_ECSET_ENABLED = 'Y' AND ECSET_STATUS &lt;&gt;'A' THEN 'EC 不可用' ELSE '' END ECSET_INHIBIT_FLAG
+        FROM (
+        <![CDATA[
+       SELECT  A.*,B.EQP_G FROM(
+        SELECT A.*
+        ,EQP_ID || DECODE(CHAMBER,NULL,NULL,'.')||
+        CASE WHEN INSTR(CHAMBER,';')>0 THEN SUBSTR(CHAMBER,1,INSTR(CHAMBER,';')-1) ELSE CHAMBER END EQP_ID_LINK
+        FROM(
+        SELECT A.*,
+        REGEXP_REPLACE(REGEXP_REPLACE(CHAMBER_RULE, '[^a-zA-Z0-9|&_-]', ''),'[|&]',';')CHAMBER
+        FROM
+        ]]>
+        <if test="fab == 'N1A3'">
+            A1_MFG.A3_RMS_MONITOR_DETAILS A
+        </if>
+        <if test="fab == 'N1A1'">
+            A1_MFG.RMS_MONITOR_DETAILS A
+        </if>
+        )A
+        )A LEFT JOIN
+        <if test="fab == 'N1A3'">
+            PWEB.EQP_ID_USE_STD@A3PDW B
+        </if>
+        <if test="fab == 'N1A1'">
+            PWEB.EQP_ID_USE_STD@A1PDW B
+        </if>
+        ON A.EQP_ID_LINK =B.EQP_ID
+        WHERE 1=1
+        <if test="eqpg !='TOTAL' and eqpg !='' and eqpg!=null">
+          AND B.EQP_G = #{eqpg,jdbcType=VARCHAR}
+        </if>
+        )A
+        LEFT JOIN (
+        SELECT PRODSPEC_ID,OPE_NO,SUM(WAFER_QTY) CUR_WIP FROM
+        <if test="fab == 'N1A3'">
+            ODS.LOT@A3PDW
+        </if>
+        <if test="fab == 'N1A1'">
+            ODS.LOT@A1PDW
+        </if>
+        WHERE LOT_INV_STATE = 'OnFloor' AND NENG_FLAG =1 AND PW_FLAG = 1
+        GROUP BY PRODSPEC_ID,OPE_NO
+        )B ON A.OPE_NO = B.OPE_NO AND A.PRODSPEC_ID = B.PRODSPEC_ID
+        ))GROUP BY EQP_ID,PP_NAME
+        ),COMMENT_INFO AS(
+        SELECT
+        EQP_ID,PP_NAME,REGEXP_REPLACE(TRIM(TRIM(REPLACE(SOURCE_COMMENT,',',' '))||' ' || REPLACE(TRIM(COMMENT_),',',' ') || ' ' ||REPLACE(TRIM(ECSET),',',' ')),' +', ' ') F_COMMENT
+        FROM(
+        SELECT
+        C.EQP_ID,C.PP_NAME
+        ,CASE WHEN D.EQP_ID IS NULL THEN C.EQP_ID || ';' || C.PP_NAME || ';未建' END
+        || ' ' || D.SOURCE_STATUS_COMMENT || ' ' ||D. SOURCE_TIME_COMMENT SOURCE_COMMENT
+        ,D.STATUS_COMMENT ||' ' || D.TIME_COMMENT COMMENT_
+        ,CASE WHEN D.EQP_ID IS NOT NULL AND  D.ECSET_STATUS IS NULL THEN D.EQP_ID ||' EC 未建'
+        WHEN D.EQP_ID IS NOT NULL AND D.ECSET_STATUS &lt;&gt; 'A' THEN D.EQP_ID ||' EC 不可用' END ECSET
+        FROM(
+        SELECT DISTINCT A.EQP_ID,A.PP_NAME
+        FROM BASE_INFO A
+        WHERE INSTR( A.PP_NAME,';')=0
+        )C
+        LEFT JOIN
+        <if test="fab == 'N1A3'">
+            A1_MFG.A3_RMS_EQP_MONITOR D
+        </if>
+        <if test="fab == 'N1A1'">
+            A1_MFG.RMS_EQP_MONITOR D
+        </if>
+        ON C.EQP_ID = D.EQP_ID AND C.PP_NAME = D.PP_NAME
+        )
+        UNION ALL
+        SELECT
+        EQP_ID,PP_NAME,REGEXP_REPLACE(REPLACE(TRIM(F_COMMENT),',',' '),' +', ' ')F_COMMENT
+        FROM(
+        SELECT
+        EQP_ID ,PP_NAME
+        ,TRACK_SOURCE_COMMENT ||' ' || TRACK_COMMENT||' ' || ' ' || TRACK_ECSET || ' ' || SCANNER_SOURCE_COMMENT || ' '|| SCANNER_COMMENT ||' ' || SCANNER_ECSET F_COMMENT
+        FROM(
+        SELECT
+        EQP_ID,PP_NAME
+        ,REGEXP_REPLACE(TRIM(TRACK_SOURCE_COMMENT), ' +', ' ') TRACK_SOURCE_COMMENT
+        ,REGEXP_REPLACE(TRIM(TRACK_COMMENT), ' +', ' ')TRACK_COMMENT
+        ,REGEXP_REPLACE(TRIM(TRACK_ECSET), ' +', ' ')TRACK_ECSET
+        ,REGEXP_REPLACE(TRIM(SCANNER_SOURCE_COMMENT), ' +', ' ')SCANNER_SOURCE_COMMENT
+        ,REGEXP_REPLACE(TRIM(SCANNER_COMMENT), ' +', ' ')SCANNER_COMMENT
+        ,REGEXP_REPLACE(TRIM(SCANNER_ECSET), ' +', ' ')SCANNER_ECSET
+        FROM(
+        SELECT
+        C.EQP_ID,C.PP_NAME
+        ,CASE WHEN C.CHECK_PPID_ENABLED = 'Y' AND D.EQP_ID IS NULL THEN C.EQP_ID || ';' || C.TRACK_RECIPE || ';未建' END
+        || ' ' || D.SOURCE_STATUS_COMMENT || ' ' ||D. SOURCE_TIME_COMMENT TRACK_SOURCE_COMMENT
+        ,CASE WHEN  C.CHECK_PPID_ENABLED = 'Y' THEN D.STATUS_COMMENT ||' ' || D.TIME_COMMENT END TRACK_COMMENT
+        ,CASE WHEN C.CHECK_ECSET_ENABLED ='Y' AND D.EQP_ID IS NOT NULL AND  D.ECSET_STATUS IS NULL THEN D.EQP_ID ||' EC 未建'
+        WHEN C.CHECK_ECSET_ENABLED ='Y' AND D.EQP_ID IS NOT NULL AND D.ECSET_STATUS &lt;&gt; 'A' THEN D.EQP_ID ||' EC 不可用' END TRACK_ECSET
+        ,CASE WHEN E.EQP_ID IS NULL THEN C.SCANNER_EQP_ID || ';' || C.SCANNER_RECIPE || ';未建' END
+        || ' ' || E.SOURCE_STATUS_COMMENT || ' ' ||E. SOURCE_TIME_COMMENT SCANNER_SOURCE_COMMENT
+        ,E.STATUS_COMMENT ||' ' || E.TIME_COMMENT SCANNER_COMMENT
+        ,CASE WHEN E.EQP_ID IS NOT NULL AND  E.ECSET_STATUS IS NULL THEN E.EQP_ID ||' EC 未建'
+        WHEN E.EQP_ID IS NOT NULL AND E.ECSET_STATUS &lt;&gt; 'A' THEN E.EQP_ID ||' EC 不可用' END SCANNER_ECSET
+        FROM(
+        SELECT DISTINCT A.EQP_ID,A.PP_NAME,A.CHECK_PPID_ENABLED,A.CHECK_ECSET_ENABLED
+        ,CASE WHEN INSTR( A.PP_NAME,';')&gt;0 THEN SUBSTR( A.PP_NAME,1,INSTR( A.PP_NAME,';')-1) END TRACK_RECIPE
+        ,B.SCANNER SCANNER_EQP_ID
+        ,CASE WHEN INSTR( A.PP_NAME,';')&gt;0 THEN SUBSTR( A.PP_NAME,INSTR( A.PP_NAME,';')+1) END SCANNER_RECIPE
+        FROM BASE_INFO A
+        LEFT JOIN A1_MFG.RMS_PHOTO_SCANNER_RELATED B
+        ON A.EQP_ID= B.EQP_ID
+        WHERE INSTR( A.PP_NAME,';')&gt;0
+        )C LEFT JOIN
+        <if test="fab == 'N1A3'">
+            A1_MFG.A3_RMS_EQP_MONITOR D
+        </if>
+        <if test="fab == 'N1A1'">
+            A1_MFG.RMS_EQP_MONITOR D
+        </if>
+        ON C.EQP_ID = D.EQP_ID AND C.TRACK_RECIPE = D.PP_NAME
+        LEFT JOIN
+        <if test="fab == 'N1A3'">
+            A1_MFG.A3_RMS_EQP_MONITOR E
+        </if>
+        <if test="fab == 'N1A1'">
+            A1_MFG.RMS_EQP_MONITOR E
+        </if>
+        ON C.SCANNER_EQP_ID = E.EQP_ID AND C.SCANNER_RECIPE = E.PP_NAME
+        ))))
+        SELECT
+        A.*,B.F_COMMENT COMMENT_DETAILS
+        FROM BASE_INFO A
+        LEFT JOIN COMMENT_INFO B
+        ON A.EQP_ID = B.EQP_ID AND A.PP_NAME = B.PP_NAME
+        WHERE 1=1
+        <if test="eqpId !='' and eqpId != null">
+            AND A.EQP_ID = #{eqpId,jdbcType=VARCHAR}
+        </if>
+        <if test="recipe !='' and recipe != null">
+            AND INSTR(A.PP_NAME,#{recipe,jdbcType=VARCHAR})&gt;0
+        </if>
+        <if test='status=="1"'>
+            AND INSTR('/'|| A.F_COMMENT || '/','/未建/') &gt;0
+        </if>
+        <if test='status=="2"'>
+            AND INSTR('/'||A.F_COMMENT || '/','/不可用/') &gt;0
+        </if>
+        <if test='status=="3"'>
+            AND INSTR('/'||A.F_COMMENT || '/','/过期/') &gt;0
+        </if>
+        <if test='status=="4"'>
+            AND INSTR('/'||A.F_COMMENT || '/','/EC 未建/') &gt;0
+        </if>
+        <if test='status=="5"'>
+            AND INSTR('/'||A.F_COMMENT || '/','/EC 不可用/') &gt;0
+        </if>
+        ORDER BY A.CUR_WIP DESC
+    </select>
+
+
+    <select id="getSumamryTrendChart" resultType="map">
+        SELECT A.SHIFT_DATE,B.EC_DOWNLOAD ,B.EC_STATUS ,B.RECIPE_DOWNLOAD ,B.RECIPE_STATUS ,B.RECIPE_TIME  FROM(
+        SELECT TO_CHAR(TRUNC(SYSDATE-9.2/24)-ROWNUM+1,'YYYYMMDD')SHIFT_DATE
+        FROM DUAL
+        CONNECT BY ROWNUM&lt;=31
+        )A LEFT JOIN(
+        SELECT SHIFT_DATE
+        ,MAX(RECIPE_DOWNLOAD)RECIPE_DOWNLOAD
+        ,MAX(RECIPE_TIME)RECIPE_TIME
+        ,MAX(RECIPE_STATUS)RECIPE_STATUS
+        ,MAX(EC_DOWNLOAD)EC_DOWNLOAD
+        ,MAX(EC_STATUS)EC_STATUS
+        FROM(
+        SELECT
+        SHIFT_DATE,ITEM,TOTAL_COUNT
+        ,CASE WHEN ITEM = 'Recipe 未建' THEN TOTAL_COUNT ELSE 0 END RECIPE_DOWNLOAD
+        ,CASE WHEN ITEM = 'Recipe 过期' THEN TOTAL_COUNT ELSE 0 END RECIPE_TIME
+        ,CASE WHEN ITEM = 'Recipe 不可用' THEN TOTAL_COUNT ELSE 0 END RECIPE_STATUS
+        ,CASE WHEN ITEM = 'EC 未建' THEN TOTAL_COUNT ELSE 0 END EC_DOWNLOAD
+        ,CASE WHEN ITEM = 'EC 不可用' THEN TOTAL_COUNT ELSE 0 END EC_STATUS
+        FROM(
+        SELECT SHIFT_DATE,ITEM,SUM(TOTAL_COUNT) TOTAL_COUNT FROM(
+        SELECT
+        SHIFT_DATE,TECH,MODULE,PRODUCT_STATUS,TOTAL_COUNT
+        ,CASE WHEN ITEM='Scanner 不可用' THEN 'Recipe 不可用'
+        WHEN ITEM='Track 不可用' THEN 'Recipe 不可用'
+        WHEN ITEM='Scanner 未建' THEN 'Recipe 未建'
+        WHEN ITEM='Track 未建' THEN 'Recipe 未建' ELSE ITEM END ITEM
+        FROM
+        <if test="fab == 'N1A1'">
+            A1_MFG.RMS_MONITOR_SUMMARY
+        </if>
+        <if test="fab == 'N1A3'">
+            A1_MFG.A3_RMS_MONITOR_SUMMARY
+        </if>
+        WHERE SHIFT_DATE > '20251208' AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD')
+        <if test="tech !='' and tech != null and tech != 'ALL'">
+            AND TECH = #{tech,jdbcType=VARCHAR}
+        </if>
+        <if test="module !='' and module != null and module != 'ALL'">
+            AND MODULE = #{module,jdbcType=VARCHAR}
+        </if>
+        <foreach collection="productStatusList" item="productStatus" open="AND PRODUCT_STATUS IN(" separator="," close=")">#{productStatus}</foreach>
+        )GROUP BY SHIFT_DATE,ITEM
+        ))GROUP BY SHIFT_DATE
+        )B ON A.SHIFT_DATE = B.SHIFT_DATE
+        ORDER BY A.SHIFT_DATE
+    </select>
+
+    <select id="getTrendChartTech" resultType="mfg.reporting.dto.CommonSelectDTO">
+        SELECT 'ALL' label,'ALL'value FROM DUAL
+        UNION ALL
+        SELECT DISTINCT TECH label,TECH value FROM  A1_MFG.RMS_MONITOR_SUMMARY
+        WHERE TECH IS NOT NULL
+    </select>
+
+
+    <select id="getRmsModuleSummaryInfo" resultType="map">
+        SELECT EQP_G,MODULE,OPE_COUNT,RECIPE_COUNT
+        ,CASE WHEN EQP_G = 'TOTAL' THEN TOTAL_WIP ELSE LINE_WIP END LINE_WIP
+        FROM(
+        SELECT NVL(EQP_G,'TOTAL')EQP_G,MAX(MODULE)MODULE
+        ,SUM(CASE WHEN OPE_COUNT_SEQ = 1 THEN 1 ELSE 0 END)OPE_COUNT
+        ,SUM(CASE WHEN RECIPE_NAME_SEQ = 1 THEN 1 ELSE 0 END) RECIPE_COUNT
+        ,SUM(CASE WHEN LINE_WIP_SEQ = 1 THEN CUR_WIP ELSE 0 END) LINE_WIP
+        ,SUM(CASE WHEN TOTAL_WIP_SEQ =1 THEN CUR_WIP ELSE 0 END) TOTAL_WIP
+        FROM(
+        SELECT A.*
+        ,ROW_NUMBER()OVER(PARTITION BY A.EQP_G,A.EQP_ID,A.PRODG1,A.OPE_NO ORDER BY A.MODULE )OPE_COUNT_SEQ
+        ,ROW_NUMBER()OVER(PARTITION BY A.EQP_ID,A.PP_NAME ORDER BY A.MODULE )RECIPE_NAME_SEQ
+        ,ROW_NUMBER()OVER(PARTITION BY A.EQP_G,A.PRODG1 ORDER BY A.MODULE) LINE_WIP_SEQ
+        ,ROW_NUMBER()OVER(PARTITION BY A.PRODG1 ORDER BY A.MODULE) TOTAL_WIP_SEQ
+        FROM(
+        SELECT DISTINCT A.*,B.EQP_G FROM(
+        SELECT
+        PRODG1,OPE_NO,PP_NAME,MODULE,CUR_WIP
+        ,EQP_ID || DECODE(CHAMBER,NULL,NULL,'.')||
+        CASE WHEN INSTR(CHAMBER,';')&gt;0 THEN SUBSTR(CHAMBER,1,INSTR(CHAMBER,';')-1) ELSE CHAMBER END EQP_ID
+        FROM(
+        <![CDATA[
+        SELECT  PRODG1,OPE_NO,EQP_ID,PP_NAME,MODULE,CUR_WIP,
+        REGEXP_REPLACE(REGEXP_REPLACE(CHAMBER_RULE, '[^a-zA-Z0-9|&_-]', ''),'[|&]',';')CHAMBER
+        FROM
+          ]]>
+        <if test="fab == 'N1A1'">
+            A1_MFG.RMS_MONITOR_DETAILS
+        </if>
+        <if test="fab == 'N1A3'">
+            A1_MFG.A3_RMS_MONITOR_DETAILS
+        </if>
+        WHERE MODULE = #{module}
+        ))A LEFT JOIN
+        <if test="fab == 'N1A3'">
+            PWEB.EQP_ID_USE_STD@A3PDW B
+        </if>
+        <if test="fab == 'N1A1'">
+            PWEB.EQP_ID_USE_STD@A1PDW B
+        </if>
+        ON A.EQP_ID =B.EQP_ID
+        )A
+        )GROUP BY ROLLUP(EQP_G)
+        )ORDER BY RECIPE_COUNT DESC
+    </select>
+
+    <select id="getRmsNGSummaryInfo" resultType="map">
+        WITH EQP_ID_LIST AS(
+        SELECT EQP_ID,MODULE FROM PWEB.EQP_ID_USE_STD@A1PDW WHERE LENGTH(EQP_ID)= 5
+        AND MODULE IN('PHOTO','ETCH','TF','DIFF','WET','CMP') AND #{fab} = #{fab}
+        UNION ALL
+        SELECT EQP_ID,MODULE FROM PWEB.EQP_ID_USE_STD@A3PDW WHERE LENGTH(EQP_ID)= 6
+        AND MODULE IN('PHOTO','ETCH','TF','DIFF','WET','CMP') AND  #{fab} = 'N1A3'
+        ),TIME_LIST AS(
+        SELECT SHOP_WEEK,WEEK_DATE FROM(
+        SELECT SHOP_WEEK,COUNT(1)WEEK_DATE,ROW_NUMBER()OVER(PARTITION BY 1 ORDER BY SHOP_WEEK DESC)RN FROM(
+        SELECT DISTINCT SHOP_WEEK ,SHIFT_DATE
+        FROM PWEB.WP_CALENDAR@A1PDW
+        WHERE SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-90,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        ) GROUP BY SHOP_WEEK
+        )WHERE RN &lt;=10
+        )
+        SELECT A.SHOP_WEEK
+        ,B.PHOTO_COUNT,B.ETCH_COUNT
+        ,B.TF_COUNT,B.DIFF_COUNT
+        ,B.WET_COUNT,B.CMP_COUNT
+        ,B.PHOTO_COUNT + B.ETCH_COUNT + B.TF_COUNT +B.DIFF_COUNT + B.WET_COUNT + B.CMP_COUNT  TTL_COUNT
+        FROM TIME_LIST A
+        LEFT JOIN(
+        SELECT SHOP_WEEK,SUM(PHOTO_COUNT)PHOTO_COUNT,SUM(ETCH_COUNT)ETCH_COUNT,SUM(TF_COUNT)TF_COUNT,SUM(DIFF_COUNT)DIFF_COUNT,
+        SUM(WET_COUNT)WET_COUNT,SUM(CMP_COUNT)CMP_COUNT
+        FROM(
+        SELECT A.*,B.SHOP_WEEK FROM(
+        SELECT SHIFT_DATE
+        ,NVL(PHOTO_COUNT,0)PHOTO_COUNT
+        ,NVL(ETCH_COUNT,0)ETCH_COUNT
+        ,NVL(TF_COUNT,0)TF_COUNT
+        ,NVL(DIFF_COUNT,0)DIFF_COUNT
+        ,NVL(WET_COUNT,0)WET_COUNT
+        ,NVL(CMP_COUNT,0)CMP_COUNT
+        FROM(
+        SELECT
+        SHIFT_DATE,MODULE,COUNT(1)NG_COUNT
+        FROM(
+        SELECT
+        B.* ,A.MODULE
+        FROM EQP_ID_LIST A
+        JOIN
+        (
+        SELECT SHIFT_DATE,EQP_ID,ACTION_NAME,TIME_STAMP,ACTION_COMMENT,PPID,PRODSPEC_ID,LOT_ID,F_COMMENT
+        FROM A1_MFG.RMS_NG_DAILY
+        WHERE SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.6/24-90,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.6/24-1,'YYYYMMDD')
+        )B
+        ON A.EQP_ID = B.EQP_ID
+        )
+        GROUP BY SHIFT_DATE,MODULE
+        )T PIVOT(
+        MAX(NG_COUNT) FOR MODULE IN('PHOTO' AS PHOTO_COUNT,'ETCH' AS ETCH_COUNT,'TF' AS TF_COUNT,'DIFF' AS DIFF_COUNT,'WET' AS WET_COUNT,'CMP' AS CMP_COUNT)
+        )
+        )A LEFT JOIN
+        (SELECT DISTINCT SHIFT_DATE,SHOP_WEEK FROM PWEB.WP_CALENDAR@A1PDW WHERE SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.6/24-90,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.6/24-1,'YYYYMMDD') )  B
+        ON A.SHIFT_DATE = B.SHIFT_DATE
+        )GROUP BY SHOP_WEEK
+        )B
+        ON A.SHOP_WEEK = B.SHOP_WEEK
+        ORDER BY A.SHOP_WEEK
+    </select>
+
+    <select id ="getRmsNGDetailsInfo" resultType="map">
+        WITH TIME_LIST AS(
+        SELECT DISTINCT SHIFT_DATE FROM PWEB.WP_CALENDAR@A1PDW
+        WHERE 1=1
+        <if test="shiftDate.length==6">
+            AND SHOP_WEEK = #{shiftDate}
+        </if>
+        <if test="shiftDate.length==8">
+            AND SHIFT_DATE = #{shiftDate}
+        </if>
+        ), EQP_ID_LIST AS(
+        SELECT EQP_ID,MODULE,EQP_G FROM PWEB.EQP_ID_USE_STD@A1PDW WHERE LENGTH(EQP_ID)= 5
+        AND MODULE IN('PHOTO','ETCH','TF','DIFF','WET','CMP') AND #{fab} = 'N1A1'
+        <if test="module != 'all' and module != '' and module !=null">
+            AND MODULE = #{module}
+        </if>
+        UNION ALL
+        SELECT EQP_ID,MODULE,EQP_G FROM PWEB.EQP_ID_USE_STD@A3PDW WHERE LENGTH(EQP_ID)= 6
+        AND MODULE IN('PHOTO','ETCH','TF','DIFF','WET','CMP') AND  #{fab} = 'N1A3'
+        <if test="module != 'all' and module != '' and module !=null">
+            AND MODULE = #{module}
+        </if>
+        ),BASE_INFO AS(
+  SELECT B.SHIFT_DATE,EQP_ID,ACTION_NAME,TIME_STAMP,ACTION_COMMENT,PPID,PRODSPEC_ID,LOT_ID,F_COMMENT
+  FROM TIME_LIST A
+         JOIN
+        A1_MFG.RMS_NG_DAILY B
+        ON A.SHIFT_DATE = B.SHIFT_DATE
+)
+        SELECT A.MODULE,A.EQP_G,B.EQP_ID,B.TIME_STAMP,B.ACTION_NAME,B.PPID,B.PRODSPEC_ID,B.LOT_ID ,DECODE(B.F_COMMENT,NULL,'N','Y')IS_RELEASE,B.F_COMMENT
+        FROM EQP_ID_LIST A
+        JOIN BASE_INFO B
+        ON A.EQP_ID = B.EQP_ID
+        ORDER BY DECODE(A.MODULE,'PHOTO',1,'ETCH',2,'TF',3,'DIFF',4,'WET',5,'CMP',6),DECODE(ACTION_NAME,'ppid_verification',1,2),A.EQP_G,B.EQP_ID
+    </select>
+
+    <select id="getRmsNgWeekGroupInfo" resultType="map">
+        WITH  EQP_ID_LIST AS(
+        SELECT EQP_ID,MODULE FROM PWEB.EQP_ID_USE_STD@A1PDW WHERE LENGTH(EQP_ID)= 5
+        AND MODULE IN('PHOTO','ETCH','TF','DIFF','WET','CMP') AND #{fab} = 'N1A1' AND MODULE =#{module}
+        UNION ALL
+        SELECT EQP_ID,MODULE FROM PWEB.EQP_ID_USE_STD@A3PDW WHERE LENGTH(EQP_ID)= 6
+        AND MODULE IN('PHOTO','ETCH','TF','DIFF','WET','CMP') AND  #{fab} = 'N1A3' AND MODULE =#{module}
+        ),TIME_LIST AS(
+        SELECT SHOP_WEEK,WEEK_DATE FROM(
+        SELECT SHOP_WEEK,COUNT(1)WEEK_DATE,ROW_NUMBER()OVER(PARTITION BY 1 ORDER BY SHOP_WEEK DESC)RN FROM(
+        SELECT DISTINCT SHOP_WEEK ,SHIFT_DATE
+        FROM PWEB.WP_CALENDAR@A1PDW
+        WHERE SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-90,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        ) GROUP BY SHOP_WEEK
+        )WHERE RN &lt;=10
+        )
+        SELECT A.SHOP_WEEK SHIFT_WEEK,B.TOTAL_COUNT,B.RELEASE_COUNT,B.REMAIN_COUNT
+        ,B.RELEASE_RATIO,B.REMAIN_RATIO
+        FROM TIME_LIST A
+        LEFT JOIN(
+        SELECT  SHIFT_WEEK,TOTAL_COUNT,RELEASE_COUNT,REMAIN_COUNT
+        ,ROUND(RELEASE_COUNT*100/TOTAL_COUNT ,1)RELEASE_RATIO
+        ,ROUND(REMAIN_COUNT*100/TOTAL_COUNT ,1)REMAIN_RATIO
+        FROM(
+        SELECT SHIFT_WEEK,COUNT(1)TOTAL_COUNT
+        ,SUM(CASE WHEN F_COMMENT IS NOT NULL THEN 1 ELSE 0 END)RELEASE_COUNT
+        ,SUM(CASE WHEN F_COMMENT IS  NULL THEN 1 END)REMAIN_COUNT
+        FROM(
+        SELECT
+        B.* ,A.MODULE
+        FROM EQP_ID_LIST A
+        JOIN
+        (
+        SELECT A.*,B.SHOP_WEEK SHIFT_WEEK  FROM(
+        SELECT SHIFT_DATE
+        ,EQP_ID,ACTION_NAME,TIME_STAMP,ACTION_COMMENT,PPID,PRODSPEC_ID,LOT_ID,F_COMMENT
+        FROM A1_MFG.RMS_NG_DAILY
+        WHERE SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.6/24-90,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.6/24-1,'YYYYMMDD')
+        )A LEFT JOIN (
+        SELECT DISTINCT SHOP_WEEK,SHIFT_DATE  FROM PWEB.WP_CALENDAR@A1PDW B
+        WHERE SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.6/24-90,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.6/24-1,'YYYYMMDD')
+        )B
+        ON A.SHIFT_DATE = B.SHIFT_DATE
+        )B
+        ON A.EQP_ID = B.EQP_ID
+        )
+        GROUP BY SHIFT_WEEK
+        ))B ON A.SHOP_WEEK = B.SHIFT_WEEK
+        ORDER BY A.SHOP_WEEK
+    </select>
+
+    <select id="getRmsRecipeSummaryGroupTotalInfo" resultType="map">
+        SELECT
+        A.SHIFT_DATE
+        ,B.PHOTO_COUNT,B.ETCH_COUNT,B.TF_COUNT,B.DIFF_COUNT,B.WET_COUNT,B.CMP_COUNT,B.TOTAL_COUNT
+        FROM(
+        SELECT TO_CHAR(TRUNC(SYSDATE-7.5/24)-ROWNUM,'YYYYMMDD')SHIFT_DATE
+        FROM DUAL
+        CONNECT BY ROWNUM &lt;= 30
+        )A LEFT JOIN(
+        SELECT  SHIFT_DATE
+        ,NVL(PHOTO_COUNT,0)PHOTO_COUNT
+        ,NVL(ETCH_COUNT,0)ETCH_COUNT
+        ,NVL(TF_COUNT,0)TF_COUNT
+        ,NVL(DIFF_COUNT,0)DIFF_COUNT
+        ,NVL(WET_COUNT,0)WET_COUNT
+        ,NVL(CMP_COUNT,0)CMP_COUNT
+        ,NVL(PHOTO_COUNT,0)+NVL(ETCH_COUNT,0)+NVL(TF_COUNT,0)+NVL(DIFF_COUNT,0)+NVL(WET_COUNT,0)+NVL(CMP_COUNT,0) TOTAL_COUNT
+        FROM(
+        SELECT SHIFT_DATE,MODULE,SUM(RECIPE_COUNT)RECIPE_COUNT FROM(
+        SELECT SHIFT_DATE,FAB,MODULE,RECIPE_COUNT,RELEASE_COUNT,ADD_COUNT
+        FROM  A1_MFG.RMS_RECIPE_MONITOR_SUMMARY
+        WHERE SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30 ,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1 ,'YYYYMMDD')
+        AND FAB = #{fab}
+        )GROUP BY SHIFT_DATE,MODULE
+        )T PIVOT(
+        MAX(RECIPE_COUNT) FOR MODULE IN('PHOTO' AS PHOTO_COUNT,'ETCH' AS ETCH_COUNT,'TF' AS TF_COUNT,'DIFF' AS DIFF_COUNT,'WET' AS WET_COUNT,'CMP' AS CMP_COUNT)
+        )
+        )B
+        ON A.SHIFT_DATE = B.SHIFT_DATE
+        ORDER BY A.SHIFT_DATE
+    </select>
+
+
+    <select id="getRmsRecipeSummaryInfo" resultType="map">
+        SELECT
+        A.SHIFT_DATE,B.MODULE,B.RECIPE_COUNT,B.RELEASE_COUNT,B.ADD_COUNT
+        FROM(
+        SELECT TO_CHAR(TRUNC(SYSDATE-7.5/24)-ROWNUM,'YYYYMMDD')SHIFT_DATE
+        FROM DUAL
+        CONNECT BY ROWNUM &lt;= 30
+        )A LEFT JOIN(
+        SELECT SHIFT_DATE,MODULE,SUM(RECIPE_COUNT)RECIPE_COUNT,SUM(RELEASE_COUNT)RELEASE_COUNT,SUM(ADD_COUNT)ADD_COUNT FROM(
+        SELECT SHIFT_DATE,FAB,MODULE,RECIPE_COUNT,RELEASE_COUNT,ADD_COUNT
+        FROM  A1_MFG.RMS_RECIPE_MONITOR_SUMMARY
+        WHERE SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30 ,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1 ,'YYYYMMDD')
+        AND FAB = #{fab}
+        <if test="module !='' and module != null and module !='TOTAL'">
+            AND MODULE = #{module}
+        </if>
+        )GROUP BY SHIFT_DATE,MODULE
+        )B
+        ON A.SHIFT_DATE = B.SHIFT_DATE
+        ORDER BY A.SHIFT_DATE,DECODE(MODULE,'PHOTO',1,'ETCH',2,'TF',3,'DIFF',4,'WET',5,'CMP',6)
+    </select>
+
+    <select id="getRmsRecipeDetailsInfo" resultType="map">
+        SELECT SHIFT_DATE,FAB,EQP_ID,PP_NAME,MODULE
+        ,REPLACE(TRIM(PPID_COMMENT),' ','/')PPID_COMMENT
+        ,EC_COMMENT,ISRELEASE,ISADD FROM(
+        SELECT
+        SHIFT_DATE,FAB,EQP_ID,PP_NAME,MODULE
+        ,CASE WHEN CHECK_PPID_ENABLED = 'Y'
+        THEN
+        CASE WHEN INSTR(DOWNLOAD_FLAG,'Y')&gt;0 THEN  '未建 ' END
+        ||
+        CASE WHEN INSTR(STATUS_FLAG,'Y')&gt;0 THEN '不可用 ' END
+        ||
+        CASE WHEN INSTR(TIME_FLAG,'Y')&gt;0 THEN '过期 ' END
+        END PPID_COMMENT
+        ,CASE WHEN CHECK_ECSET_ENABLED = 'Y' AND ECSET_STATUS IS NULL
+        THEN 'EC未建'
+        WHEN CHECK_ECSET_ENABLED = 'Y' AND NVL(ECSET_STATUS,'Y') &lt;&gt;'A'
+        THEN 'EC不可用'
+        END EC_COMMENT
+        ,ISRELEASE,ISADD
+        FROM A1_MFG.RMS_RECIPE_MONITOR_DETAILS
+        WHERE SHIFT_DATE = #{shiftDate}
+        AND FAB = #{fab} AND MODULE = #{module}
+        )A
+    </select>
+</mapper>

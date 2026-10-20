@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.HomePageMapper">
+    <select id="getClickRateSummary" resultType="java.util.Map">
+        SELECT MENU_NAME,ROUTE_NAME,CLICK_TIME FROM A1_MFG.SYS_CLICK_DATE_SUMMARY
+        WHERE 1=1
+        <if test="weekType!= '' and weekType != null ">
+            AND WEEKTYPE=#{weekType}
+        </if>
+        <if test="rankType!= '' and weekType != null ">
+            AND RANKTYPE= #{rankType}
+        </if>
+        ORDER BY RANK
+    </select>
+
+    <select id="getMenuInfolist" resultType="mfg.reporting.pojo.MenuInfo">
+        SELECT ROUTE_NAME,MENU_NAME,"PATH" FROM A1MFG.SYS_MENU_LIST WHERE
+        HIDE = 'N'
+        <if test="menuType == 'commonWeb'">
+            AND STATUS ='prod'  AND PARENT_MENU_ID ='MENU_2'
+            AND MENU_TYPE IN('page','link')
+        </if>
+        <if test="menuType == 'test'">
+            AND STATUS ='test'  AND MENU_TYPE ='page'
+        </if>
+        <if test="menuType == 'outerLink'">
+            AND STATUS ='prod' AND PARENT_MENU_ID ='MENU_13'
+            AND MENU_TYPE ='link'
+        </if>
+        ORDER BY RANK
+    </select>
+</mapper>

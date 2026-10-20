@@ -1,0 +1,708 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.SGSWipSummaryMapper">
+    <resultMap id="SGSWipSummaryDTOMap" type="mfg.reporting.dto.SGSWipSummaryDTO">
+        <result property="tech" column="TECH"/>
+        <result property="sgsGroup" column="SGS_GROUP"/>
+        <result property="operNo" column="OPE_NO"/>
+        <result property="currentA1Wip" column="CURRENT_N1A1_WIP"/>
+        <result property="currentA3Wip" column="CURRENT_N1A3_WIP"/>
+        <result property="tdA1Wip" column="TD_N1A1_WIP"/>
+        <result property="tdA3Wip" column="TD_N1A3_WIP"/>
+        <result property="day1A1Wip" column="DAY1_N1A1_WIP"/>
+        <result property="day1A3Wip" column="DAY1_N1A3_WIP"/>
+        <result property="day2A1Wip" column="DAY2_N1A1_WIP"/>
+        <result property="day2A3Wip" column="DAY2_N1A3_WIP"/>
+        <result property="day3A1Wip" column="DAY3_N1A1_WIP"/>
+        <result property="day3A3Wip" column="DAY3_N1A3_WIP"/>
+        <result property="day4A1Wip" column="DAY4_N1A1_WIP"/>
+        <result property="day4A3Wip" column="DAY4_N1A3_WIP"/>
+        <result property="day5A1Wip" column="DAY5_N1A1_WIP"/>
+        <result property="day5A3Wip" column="DAY5_N1A3_WIP"/>
+        <result property="day6A1Wip" column="DAY6_N1A1_WIP"/>
+        <result property="day6A3Wip" column="DAY6_N1A3_WIP"/>
+    </resultMap>
+
+    <resultMap id="SGSWipDetailDTOMap" type="mfg.reporting.dto.SGSWipDetailDTO">
+        <result property="locationFab" column="LOCATION_FAB"/>
+        <result property="fab" column="FAB"/>
+        <result property="tech" column="TECH"/>
+        <result property="prodg1" column="PRODG1"/>
+        <result property="prodspecId" column="PRODSPEC_ID"/>
+        <result property="lotId" column="LOT_ID"/>
+        <result property="waferQty" column="WAFER_QTY"/>
+        <result property="neng" column="NENG_FLAG"/>
+        <result property="lotPriority" column="LOT_PRIORITY"/>
+        <result property="lotProcState" column="LOT_PROC_STATE"/>
+        <result property="currentOperNo" column="CUR_OPE_NO"/>
+        <result property="operNo" column="OPE_NO"/>
+        <result property="wipCategory" column="WIP_CATEGORY"/>
+        <result property="closeHour" column="CLOSE_HOUR"/>
+        <result property="sgsGroup" column="SGS_GROUP"/>
+        <result property="sgsEqp" column="SGS_EQP"/>
+        <result property="fcstDate" column="FCST_SHIFT_DATE"/>
+        <result property="fcstTime" column="FCST_TIME"/>
+    </resultMap>
+
+
+    <sql id="typeCondition">
+        <choose>
+            <when test="type == 'currentA1Wip'">
+                AND T.FAB='N1A1'
+            </when>
+            <when test="type == 'currentA3Wip'">
+                AND T.FAB='N1A3'
+            </when>
+            <when test="type == 'tdA1Wip'">
+                AND T.FAB='N1A1'
+                AND T.FCST_SHIFT_DATE=TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD')
+            </when>
+            <when test="type == 'tdA3Wip'">
+                AND T.FAB='N1A3'
+                AND T.FCST_SHIFT_DATE=TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD')
+            </when>
+            <when test="type == 'day1A1Wip'">
+                AND T.FAB='N1A1'
+                AND T.FCST_SHIFT_DATE=TO_CHAR(SYSDATE-7.5/24 +1,'YYYYMMDD')
+            </when>
+            <when test="type == 'day1A3Wip'">
+                AND T.FAB='N1A3'
+                AND T.FCST_SHIFT_DATE=TO_CHAR(SYSDATE-7.5/24 +1,'YYYYMMDD')
+            </when>
+            <when test="type == 'day2A1Wip'">
+                AND T.FAB='N1A1'
+                AND T.FCST_SHIFT_DATE=TO_CHAR(SYSDATE-7.5/24 +2,'YYYYMMDD')
+            </when>
+            <when test="type == 'day2A3Wip'">
+                AND T.FAB='N1A3'
+                AND T.FCST_SHIFT_DATE=TO_CHAR(SYSDATE-7.5/24 +2,'YYYYMMDD')
+            </when>
+            <when test="type == 'day3A1Wip'">
+                AND T.FAB='N1A1'
+                AND T.FCST_SHIFT_DATE=TO_CHAR(SYSDATE-7.5/24 +3,'YYYYMMDD')
+            </when>
+            <when test="type == 'day3A3Wip'">
+                AND T.FAB='N1A3'
+                AND T.FCST_SHIFT_DATE=TO_CHAR(SYSDATE-7.5/24 +3,'YYYYMMDD')
+            </when>
+            <when test="type == 'day4A1Wip'">
+                AND T.FAB='N1A1'
+                AND T.FCST_SHIFT_DATE=TO_CHAR(SYSDATE-7.5/24 +4,'YYYYMMDD')
+            </when>
+            <when test="type == 'day4A3Wip'">
+                AND T.FAB='N1A3'
+                AND T.FCST_SHIFT_DATE=TO_CHAR(SYSDATE-7.5/24 +4,'YYYYMMDD')
+            </when>
+            <when test="type == 'day5A1Wip'">
+                AND T.FAB='N1A1'
+                AND T.FCST_SHIFT_DATE=TO_CHAR(SYSDATE-7.5/24 +5,'YYYYMMDD')
+            </when>
+            <when test="type == 'day5A3Wip'">
+                AND T.FAB='N1A3'
+                AND T.FCST_SHIFT_DATE=TO_CHAR(SYSDATE-7.5/24 +5,'YYYYMMDD')
+            </when>
+            <when test="type == 'day6A1Wip'">
+                AND T.FAB='N1A1'
+                AND T.FCST_SHIFT_DATE=TO_CHAR(SYSDATE-7.5/24 +6,'YYYYMMDD')
+            </when>
+            <when test="type == 'day6A3Wip'">
+                AND T.FAB='N1A3'
+                AND T.FCST_SHIFT_DATE=TO_CHAR(SYSDATE-7.5/24 +6,'YYYYMMDD')
+            </when>
+
+        </choose>
+    </sql>
+
+    <select id="getSGSWipSummary" resultMap="SGSWipSummaryDTOMap">
+        WITH LOT_DATA AS (
+        SELECT T.TECH
+        , T.PRODG1
+        , T.PRODSPEC_ID
+        , T.LOCATION_FAB
+        , T.FAB
+        , T.LAYER
+        , T.NENG_FLAG
+        , T.LOT_ID
+        , T.WAFER_QTY
+        , T.CUR_OPE_NO
+        , T.OPE_NO
+        , B.OPE_SEQ AS OPER_SEQ
+        , DECODE(T.CUR_OPE_NO ,T.OPE_NO,'当站','Coming') AS WIP_CATEGORY
+        , T.FCST_TIME
+        , T.FCST_SHIFT_DATE
+        , T.CLOSE_HOUR
+        , T.SGS_GROUP
+        , T.SGS_EQP
+        , T.MAINPD_ID
+        , T.STD_CT_END
+        , T.MIN_STD_TIME
+        , T.SGS_FIRST_OP
+        , T.INLINE_CYC_ACC
+        , ROW_NUMBER() OVER(PARTITION BY T.LOT_ID, T.FCST_SHIFT_DATE ORDER BY T.OPE_SEQ) RN
+        FROM A1MFG.PR_SGS_EQP_WIP T
+        LEFT JOIN A1MFG.TECH_FLOW_MAINTAIN B ON T.TECH = B.TECH AND T.OPE_NO = B.OPE_NO
+        WHERE 1=1
+        AND T.FCST_SHIFT_DATE BETWEEN TO_CHAR(SYSDATE -7.5/24,'YYYYMMDD') AND TO_CHAR(SYSDATE -7.5/24 +6,'YYYYMMDD')
+        <if test="neng == 'all'">
+            AND T.NENG_FLAG LIKE '%'
+        </if>
+        <if test="neng != 'all'">
+            AND T.NENG_FLAG =#{neng}
+        </if>
+        AND T.SGS_EQP = #{eqpid}
+        )
+        , CURRENT_WIP AS (
+        SELECT A.TECH
+        , A.SGS_GROUP
+        , A.OPE_NO
+        , SUM(CASE WHEN A.FAB = 'N1A1' THEN A.WAFER_QTY ELSE 0 END) AS CURRENT_N1A1_WIP
+        , SUM(CASE WHEN A.FAB = 'N1A3' THEN A.WAFER_QTY ELSE 0 END) AS CURRENT_N1A3_WIP
+        FROM LOT_DATA A
+        WHERE A.RN = 1
+        AND WIP_CATEGORY ='当站'
+        GROUP BY A.TECH, A.SGS_GROUP, A.OPE_NO
+        )
+        , COMING_WIP AS (
+        SELECT A.TECH
+        , A.SGS_GROUP
+        , A.OPE_NO
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD') AND A.FAB = 'N1A1' THEN A.WAFER_QTY ELSE 0 END) AS TD_N1A1_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD') AND A.FAB = 'N1A3' THEN A.WAFER_QTY ELSE 0 END) AS TD_N1A3_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+1,'YYYYMMDD') AND A.FAB = 'N1A1' THEN A.WAFER_QTY ELSE 0 END) AS DAY1_N1A1_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+1,'YYYYMMDD') AND A.FAB = 'N1A3' THEN A.WAFER_QTY ELSE 0 END) AS DAY1_N1A3_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+2,'YYYYMMDD') AND A.FAB = 'N1A1' THEN A.WAFER_QTY ELSE 0 END) AS DAY2_N1A1_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+2,'YYYYMMDD') AND A.FAB = 'N1A3' THEN A.WAFER_QTY ELSE 0 END) AS DAY2_N1A3_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+3,'YYYYMMDD') AND A.FAB = 'N1A1' THEN A.WAFER_QTY ELSE 0 END) AS DAY3_N1A1_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+3,'YYYYMMDD') AND A.FAB = 'N1A3' THEN A.WAFER_QTY ELSE 0 END) AS DAY3_N1A3_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+4,'YYYYMMDD') AND A.FAB = 'N1A1' THEN A.WAFER_QTY ELSE 0 END) AS DAY4_N1A1_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+4,'YYYYMMDD') AND A.FAB = 'N1A3' THEN A.WAFER_QTY ELSE 0 END) AS DAY4_N1A3_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+5,'YYYYMMDD') AND A.FAB = 'N1A1' THEN A.WAFER_QTY ELSE 0 END) AS DAY5_N1A1_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+5,'YYYYMMDD') AND A.FAB = 'N1A3' THEN A.WAFER_QTY ELSE 0 END) AS DAY5_N1A3_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+6,'YYYYMMDD') AND A.FAB = 'N1A1' THEN A.WAFER_QTY ELSE 0 END) AS DAY6_N1A1_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+6,'YYYYMMDD') AND A.FAB = 'N1A3' THEN A.WAFER_QTY ELSE 0 END) AS DAY6_N1A3_WIP
+        FROM LOT_DATA A
+        WHERE A.RN = 1
+        AND A.FCST_SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24+6,'YYYYMMDD')
+        AND WIP_CATEGORY = 'Coming'
+        GROUP BY TECH, SGS_GROUP, OPE_NO
+        )
+        , MAIN_RESULT AS (
+        SELECT DISTINCT C.TECH
+        , C.SGS_GROUP
+        , C.OPE_NO
+        , C.OPER_SEQ
+        , NVL(B.CURRENT_N1A1_WIP,0) AS CURRENT_N1A1_WIP
+        , NVL(B.CURRENT_N1A3_WIP,0) AS CURRENT_N1A3_WIP
+        , NVL(A.TD_N1A1_WIP,0) AS TD_N1A1_WIP
+        , NVL(A.TD_N1A3_WIP,0) AS TD_N1A3_WIP
+        , NVL(A.DAY1_N1A1_WIP,0) AS DAY1_N1A1_WIP
+        , NVL(A.DAY1_N1A3_WIP,0) AS DAY1_N1A3_WIP
+        , NVL(A.DAY2_N1A1_WIP,0) AS DAY2_N1A1_WIP
+        , NVL(A.DAY2_N1A3_WIP,0) AS DAY2_N1A3_WIP
+        , NVL(A.DAY3_N1A1_WIP,0) AS DAY3_N1A1_WIP
+        , NVL(A.DAY3_N1A3_WIP,0) AS DAY3_N1A3_WIP
+        , NVL(A.DAY4_N1A1_WIP,0) AS DAY4_N1A1_WIP
+        , NVL(A.DAY4_N1A3_WIP,0) AS DAY4_N1A3_WIP
+        , NVL(A.DAY5_N1A1_WIP,0) AS DAY5_N1A1_WIP
+        , NVL(A.DAY5_N1A3_WIP,0) AS DAY5_N1A3_WIP
+        , NVL(A.DAY6_N1A1_WIP,0) AS DAY6_N1A1_WIP
+        , NVL(A.DAY6_N1A3_WIP,0) AS DAY6_N1A3_WIP
+        FROM LOT_DATA C
+        LEFT JOIN COMING_WIP A ON A.TECH = C.TECH AND A.SGS_GROUP = C.SGS_GROUP AND A.OPE_NO = C.OPE_NO
+        LEFT JOIN CURRENT_WIP B ON C.TECH = B.TECH AND C.SGS_GROUP = B.SGS_GROUP AND C.OPE_NO = B.OPE_NO
+        WHERE C.RN =1
+        )
+        SELECT CASE WHEN GROUPING_ID(TECH, SGS_GROUP, OPE_NO) = 3 THEN TECH  -- TECH小计
+        WHEN GROUPING_ID(TECH, SGS_GROUP, OPE_NO) = 7 THEN 'Total'  -- 总计
+        ELSE TECH
+        END AS TECH
+        , CASE WHEN GROUPING_ID(TECH, SGS_GROUP, OPE_NO) = 3 THEN 'Total'  -- TECH小计
+        WHEN GROUPING_ID(TECH, SGS_GROUP, OPE_NO) = 7 THEN 'Total'  -- 总计
+        ELSE SGS_GROUP
+        END AS SGS_GROUP
+        , CASE WHEN GROUPING_ID(TECH, SGS_GROUP, OPE_NO) = 3 THEN 'Total'  -- TECH小计
+        WHEN GROUPING_ID(TECH, SGS_GROUP, OPE_NO) = 7 THEN 'Total'  -- 总计
+        ELSE OPE_NO
+        END AS OPE_NO
+        , SUM(CURRENT_N1A1_WIP) AS CURRENT_N1A1_WIP
+        , SUM(CURRENT_N1A3_WIP) AS CURRENT_N1A3_WIP
+        , SUM(TD_N1A1_WIP) AS TD_N1A1_WIP
+        , SUM(TD_N1A3_WIP) AS TD_N1A3_WIP
+        , SUM(DAY1_N1A1_WIP) AS DAY1_N1A1_WIP
+        , SUM(DAY1_N1A3_WIP) AS DAY1_N1A3_WIP
+        , SUM(DAY2_N1A1_WIP) AS DAY2_N1A1_WIP
+        , SUM(DAY2_N1A3_WIP) AS DAY2_N1A3_WIP
+        , SUM(DAY3_N1A1_WIP) AS DAY3_N1A1_WIP
+        , SUM(DAY3_N1A3_WIP) AS DAY3_N1A3_WIP
+        , SUM(DAY4_N1A1_WIP) AS DAY4_N1A1_WIP
+        , SUM(DAY4_N1A3_WIP) AS DAY4_N1A3_WIP
+        , SUM(DAY5_N1A1_WIP) AS DAY5_N1A1_WIP
+        , SUM(DAY5_N1A3_WIP) AS DAY5_N1A3_WIP
+        , SUM(DAY6_N1A1_WIP) AS DAY6_N1A1_WIP
+        , SUM(DAY6_N1A3_WIP) AS DAY6_N1A3_WIP
+        , GROUPING_ID(TECH, SGS_GROUP, OPE_NO) AS GRP_ID
+        FROM MAIN_RESULT
+        GROUP BY GROUPING SETS (
+        (TECH, SGS_GROUP, OPE_NO,OPER_SEQ),
+        (TECH),
+        ()
+        )
+        ORDER BY
+        CASE WHEN TECH = 'Total' THEN 2 ELSE 1 END,
+        TECH,
+        CASE WHEN SGS_GROUP = 'Total' THEN 1 ELSE 0 END,
+        SGS_GROUP,OPER_SEQ,
+        OPE_NO
+
+    </select>
+
+    <select id="getSGSWipDetail" resultMap="SGSWipDetailDTOMap">
+        <if test="type == 'currentA1Wip' or type == 'currentA3Wip'">
+            WITH LOT_DATA AS (
+            SELECT T.TECH
+            , T.PRODG1
+            , T.PRODSPEC_ID
+            , T.LOCATION_FAB
+            , T.FAB
+            , T.LAYER
+            , T.NENG_FLAG
+            , T.LOT_ID
+            , T.WAFER_QTY
+            , T.LOT_PROC_STATE
+            , T.CUR_OPE_NO
+            , T.OPE_NO
+            , DECODE(T.CUR_OPE_NO ,T.OPE_NO,'当站','Coming') AS WIP_CATEGORY
+            , TO_CHAR(T.FCST_TIME, 'YYYY-MM-DD HH24:MM:SS') AS FCST_TIME
+            , T.FCST_SHIFT_DATE
+            , T.CLOSE_HOUR
+            , T.SGS_GROUP
+            , T.SGS_EQP
+            , T.MAINPD_ID
+            , T.STD_CT_END
+            , T.MIN_STD_TIME
+            , T.SGS_FIRST_OP
+            , T.INLINE_CYC_ACC
+            , ROW_NUMBER() OVER(PARTITION BY T.LOT_ID ORDER BY T.OPE_SEQ) RN
+            FROM A1MFG.PR_SGS_EQP_WIP T
+            WHERE 1=1
+            AND T.SGS_EQP = #{eqpid}
+            <include refid="typeCondition"/>
+
+            <if test="tech != 'Total'">
+                AND T.TECH = #{tech}
+            </if>
+
+            <if test="openo != 'Total' and sgsgroup != 'Total'">
+                AND T.SGS_GROUP = #{sgsgroup}
+                AND T.OPE_NO = #{openo}
+            </if>
+            <if test="neng == 'all'">
+                AND T.NENG_FLAG LIKE '%'
+            </if>
+            <if test="neng != 'all'">
+                AND T.NENG_FLAG =#{neng}
+            </if>
+            )
+            SELECT A.LOCATION_FAB
+            , A.FAB
+            , A.TECH
+            , A.PRODG1
+            , A.PRODSPEC_ID
+            , A.LOT_ID
+            , A.WAFER_QTY
+            , A.NENG_FLAG
+            , TO_NUMBER(B.LOT_PRIORITY) AS LOT_PRIORITY
+            , A.LOT_PROC_STATE
+            , A.CUR_OPE_NO
+            , A.OPE_NO
+            , A.WIP_CATEGORY
+            , A.CLOSE_HOUR
+            , A.SGS_GROUP
+            , A.SGS_EQP
+            , A.FCST_SHIFT_DATE
+            , A.FCST_TIME
+            FROM LOT_DATA A
+            LEFT JOIN PWEB.A3_LOT_PRIORITY B ON A.PRODG1 = B.PRODG1 AND A.LOT_ID =B.LOT_ID
+            WHERE A.RN = 1
+            AND A.WIP_CATEGORY ='当站'
+            ORDER BY A.PRODG1, A.CUR_OPE_NO
+        </if>
+
+        <if test="type != 'currentA1Wip' and type != 'currentA3Wip'">
+            WITH LOT_DATA AS (
+            SELECT T.TECH
+            , T.PRODG1
+            , T.PRODSPEC_ID
+            , T.LOCATION_FAB
+            , T.FAB
+            , T.LAYER
+            , T.NENG_FLAG
+            , T.LOT_ID
+            , T.WAFER_QTY
+            , T.LOT_PROC_STATE
+            , T.CUR_OPE_NO
+            , T.OPE_NO
+            , DECODE(T.CUR_OPE_NO ,T.OPE_NO,'当站','Coming') AS WIP_CATEGORY
+            , TO_CHAR(T.FCST_TIME, 'YYYY-MM-DD HH24:MM:SS') AS FCST_TIME
+            , T.FCST_SHIFT_DATE
+            , T.CLOSE_HOUR
+            , T.SGS_GROUP
+            , T.SGS_EQP
+            , T.MAINPD_ID
+            , T.STD_CT_END
+            , T.MIN_STD_TIME
+            , T.SGS_FIRST_OP
+            , T.INLINE_CYC_ACC
+            , ROW_NUMBER() OVER(PARTITION BY T.LOT_ID ORDER BY T.OPE_SEQ) RN
+            FROM A1MFG.PR_SGS_EQP_WIP T
+            WHERE 1=1
+            AND T.SGS_EQP = #{eqpid}
+            <include refid="typeCondition"/>
+
+            <if test="tech != 'Total'">
+                AND T.TECH = #{tech}
+            </if>
+
+            <if test="openo != 'Total' and sgsgroup != 'Total'">
+                AND T.SGS_GROUP = #{sgsgroup}
+            </if>
+            <if test="neng == 'all'">
+                AND T.NENG_FLAG LIKE '%'
+            </if>
+            <if test="neng != 'all'">
+                AND T.NENG_FLAG =#{neng}
+            </if>
+            )
+            SELECT A.LOCATION_FAB
+            , A.FAB
+            , A.TECH
+            , A.PRODG1
+            , A.PRODSPEC_ID
+            , A.LOT_ID
+            , A.WAFER_QTY
+            , A.NENG_FLAG
+            , TO_NUMBER(B.LOT_PRIORITY) AS LOT_PRIORITY
+            , A.LOT_PROC_STATE
+            , A.CUR_OPE_NO
+            , A.OPE_NO
+            , A.WIP_CATEGORY
+            , A.CLOSE_HOUR
+            , A.SGS_GROUP
+            , A.SGS_EQP
+            , A.FCST_SHIFT_DATE
+            , A.FCST_TIME
+            FROM LOT_DATA A
+            LEFT JOIN PWEB.A3_LOT_PRIORITY B ON A.PRODG1 = B.PRODG1 AND A.LOT_ID =B.LOT_ID
+            WHERE A.RN = 1
+            AND A.WIP_CATEGORY ='Coming'
+            <if test="openo != 'Total' and sgsgroup != 'Total'">
+                AND A.OPE_NO = #{openo}
+            </if>
+            ORDER BY A.PRODG1, A.CUR_OPE_NO
+        </if>
+
+
+    </select>
+
+    <select id="getSGSWipTotalSummary" resultMap="SGSWipSummaryDTOMap">
+        WITH LOT_DATA AS (
+        SELECT T.TECH
+        , T.PRODG1
+        , T.PRODSPEC_ID
+        , T.LOCATION_FAB
+        , T.FAB
+        , T.LAYER
+        , T.NENG_FLAG
+        , T.LOT_ID
+        , T.WAFER_QTY
+        , T.CUR_OPE_NO
+        , T.OPE_NO
+        , B.OPE_SEQ AS OPER_SEQ
+        , DECODE(T.CUR_OPE_NO ,T.OPE_NO,'当站','Coming') AS WIP_CATEGORY
+        , T.FCST_TIME
+        , T.FCST_SHIFT_DATE
+        , T.CLOSE_HOUR
+        , T.SGS_GROUP
+        , T.SGS_EQP
+        , T.MAINPD_ID
+        , T.STD_CT_END
+        , T.MIN_STD_TIME
+        , T.SGS_FIRST_OP
+        , T.INLINE_CYC_ACC
+        FROM A1MFG.PR_SGS_EQP_WIP T
+        LEFT JOIN A1MFG.TECH_FLOW_MAINTAIN B ON T.TECH = B.TECH AND T.OPE_NO = B.OPE_NO
+        WHERE 1=1
+        AND T.FCST_SHIFT_DATE BETWEEN TO_CHAR(SYSDATE -7.5/24,'YYYYMMDD') AND TO_CHAR(SYSDATE -7.5/24 +6,'YYYYMMDD')
+        <if test="neng == 'all'">
+            AND T.NENG_FLAG LIKE '%'
+        </if>
+        <if test="neng != 'all'">
+            AND T.NENG_FLAG =#{neng}
+        </if>
+        AND T.SGS_EQP = #{eqpid}
+        )
+        , CURRENT_WIP AS (
+        SELECT A.TECH
+        , A.SGS_GROUP
+        , A.OPE_NO
+        , SUM(CASE WHEN A.FAB = 'N1A1' THEN A.WAFER_QTY ELSE 0 END) AS CURRENT_N1A1_WIP
+        , SUM(CASE WHEN A.FAB = 'N1A3' THEN A.WAFER_QTY ELSE 0 END) AS CURRENT_N1A3_WIP
+        FROM LOT_DATA A
+        WHERE 1 = 1
+        AND A.WIP_CATEGORY ='当站'
+        GROUP BY A.TECH, A.SGS_GROUP, A.OPE_NO
+        )
+        , COMING_WIP AS (
+        SELECT A.TECH
+        , A.SGS_GROUP
+        , A.OPE_NO
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD') AND A.FAB = 'N1A1' THEN A.WAFER_QTY ELSE 0 END) AS TD_N1A1_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD') AND A.FAB = 'N1A3' THEN A.WAFER_QTY ELSE 0 END) AS TD_N1A3_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+1,'YYYYMMDD') AND A.FAB = 'N1A1' THEN A.WAFER_QTY ELSE 0 END) AS DAY1_N1A1_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+1,'YYYYMMDD') AND A.FAB = 'N1A3' THEN A.WAFER_QTY ELSE 0 END) AS DAY1_N1A3_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+2,'YYYYMMDD') AND A.FAB = 'N1A1' THEN A.WAFER_QTY ELSE 0 END) AS DAY2_N1A1_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+2,'YYYYMMDD') AND A.FAB = 'N1A3' THEN A.WAFER_QTY ELSE 0 END) AS DAY2_N1A3_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+3,'YYYYMMDD') AND A.FAB = 'N1A1' THEN A.WAFER_QTY ELSE 0 END) AS DAY3_N1A1_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+3,'YYYYMMDD') AND A.FAB = 'N1A3' THEN A.WAFER_QTY ELSE 0 END) AS DAY3_N1A3_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+4,'YYYYMMDD') AND A.FAB = 'N1A1' THEN A.WAFER_QTY ELSE 0 END) AS DAY4_N1A1_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+4,'YYYYMMDD') AND A.FAB = 'N1A3' THEN A.WAFER_QTY ELSE 0 END) AS DAY4_N1A3_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+5,'YYYYMMDD') AND A.FAB = 'N1A1' THEN A.WAFER_QTY ELSE 0 END) AS DAY5_N1A1_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+5,'YYYYMMDD') AND A.FAB = 'N1A3' THEN A.WAFER_QTY ELSE 0 END) AS DAY5_N1A3_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+6,'YYYYMMDD') AND A.FAB = 'N1A1' THEN A.WAFER_QTY ELSE 0 END) AS DAY6_N1A1_WIP
+        , SUM(CASE WHEN A.FCST_SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24+6,'YYYYMMDD') AND A.FAB = 'N1A3' THEN A.WAFER_QTY ELSE 0 END) AS DAY6_N1A3_WIP
+        FROM LOT_DATA A
+        WHERE 1 = 1
+        AND A.FCST_SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24+6,'YYYYMMDD')
+        AND A.WIP_CATEGORY = 'Coming'
+        GROUP BY A.TECH, A.SGS_GROUP, A.OPE_NO
+        )
+        , MAIN_RESULT AS (
+        SELECT DISTINCT C.TECH
+        , C.SGS_GROUP
+        , C.OPE_NO
+        , C.OPER_SEQ
+        , NVL(B.CURRENT_N1A1_WIP,0) AS CURRENT_N1A1_WIP
+        , NVL(B.CURRENT_N1A3_WIP,0) AS CURRENT_N1A3_WIP
+        , NVL(A.TD_N1A1_WIP,0) AS TD_N1A1_WIP
+        , NVL(A.TD_N1A3_WIP,0) AS TD_N1A3_WIP
+        , NVL(A.DAY1_N1A1_WIP,0) AS DAY1_N1A1_WIP
+        , NVL(A.DAY1_N1A3_WIP,0) AS DAY1_N1A3_WIP
+        , NVL(A.DAY2_N1A1_WIP,0) AS DAY2_N1A1_WIP
+        , NVL(A.DAY2_N1A3_WIP,0) AS DAY2_N1A3_WIP
+        , NVL(A.DAY3_N1A1_WIP,0) AS DAY3_N1A1_WIP
+        , NVL(A.DAY3_N1A3_WIP,0) AS DAY3_N1A3_WIP
+        , NVL(A.DAY4_N1A1_WIP,0) AS DAY4_N1A1_WIP
+        , NVL(A.DAY4_N1A3_WIP,0) AS DAY4_N1A3_WIP
+        , NVL(A.DAY5_N1A1_WIP,0) AS DAY5_N1A1_WIP
+        , NVL(A.DAY5_N1A3_WIP,0) AS DAY5_N1A3_WIP
+        , NVL(A.DAY6_N1A1_WIP,0) AS DAY6_N1A1_WIP
+        , NVL(A.DAY6_N1A3_WIP,0) AS DAY6_N1A3_WIP
+        FROM LOT_DATA C
+        LEFT JOIN COMING_WIP A ON A.TECH = C.TECH AND A.SGS_GROUP = C.SGS_GROUP AND A.OPE_NO = C.OPE_NO
+        LEFT JOIN CURRENT_WIP B ON C.TECH = B.TECH AND C.SGS_GROUP = B.SGS_GROUP AND C.OPE_NO = B.OPE_NO
+        )
+        SELECT CASE WHEN GROUPING_ID(TECH, SGS_GROUP, OPE_NO) = 3 THEN TECH  -- TECH小计
+        WHEN GROUPING_ID(TECH, SGS_GROUP, OPE_NO) = 7 THEN 'Total'  -- 总计
+        ELSE TECH
+        END AS TECH
+        , CASE WHEN GROUPING_ID(TECH, SGS_GROUP, OPE_NO) = 3 THEN 'Total'  -- TECH小计
+        WHEN GROUPING_ID(TECH, SGS_GROUP, OPE_NO) = 7 THEN 'Total'  -- 总计
+        ELSE SGS_GROUP
+        END AS SGS_GROUP
+        , CASE WHEN GROUPING_ID(TECH, SGS_GROUP, OPE_NO) = 3 THEN 'Total'  -- TECH小计
+        WHEN GROUPING_ID(TECH, SGS_GROUP, OPE_NO) = 7 THEN 'Total'  -- 总计
+        ELSE OPE_NO
+        END AS OPE_NO
+        , SUM(CURRENT_N1A1_WIP) AS CURRENT_N1A1_WIP
+        , SUM(CURRENT_N1A3_WIP) AS CURRENT_N1A3_WIP
+        , SUM(TD_N1A1_WIP) AS TD_N1A1_WIP
+        , SUM(TD_N1A3_WIP) AS TD_N1A3_WIP
+        , SUM(DAY1_N1A1_WIP) AS DAY1_N1A1_WIP
+        , SUM(DAY1_N1A3_WIP) AS DAY1_N1A3_WIP
+        , SUM(DAY2_N1A1_WIP) AS DAY2_N1A1_WIP
+        , SUM(DAY2_N1A3_WIP) AS DAY2_N1A3_WIP
+        , SUM(DAY3_N1A1_WIP) AS DAY3_N1A1_WIP
+        , SUM(DAY3_N1A3_WIP) AS DAY3_N1A3_WIP
+        , SUM(DAY4_N1A1_WIP) AS DAY4_N1A1_WIP
+        , SUM(DAY4_N1A3_WIP) AS DAY4_N1A3_WIP
+        , SUM(DAY5_N1A1_WIP) AS DAY5_N1A1_WIP
+        , SUM(DAY5_N1A3_WIP) AS DAY5_N1A3_WIP
+        , SUM(DAY6_N1A1_WIP) AS DAY6_N1A1_WIP
+        , SUM(DAY6_N1A3_WIP) AS DAY6_N1A3_WIP
+        , GROUPING_ID(TECH, SGS_GROUP, OPE_NO) AS GRP_ID
+        FROM MAIN_RESULT
+        GROUP BY GROUPING SETS (
+        (TECH, SGS_GROUP, OPE_NO,OPER_SEQ),
+        (TECH),
+        ()
+        )
+        ORDER BY
+        CASE WHEN TECH = 'Total' THEN 2 ELSE 1 END,
+        TECH,
+        CASE WHEN SGS_GROUP = 'Total' THEN 1 ELSE 0 END,
+        SGS_GROUP,OPER_SEQ,
+        OPE_NO
+
+    </select>
+
+    <select id="getSGSWipTotalDetail" resultMap="SGSWipDetailDTOMap">
+        <if test="type == 'currentA1Wip' or type == 'currentA3Wip'">
+            WITH LOT_DATA AS (
+            SELECT T.TECH
+            , T.PRODG1
+            , T.PRODSPEC_ID
+            , T.LOCATION_FAB
+            , T.FAB
+            , T.LAYER
+            , T.NENG_FLAG
+            , T.LOT_ID
+            , T.WAFER_QTY
+            , T.LOT_PROC_STATE
+            , T.CUR_OPE_NO
+            , T.OPE_NO
+            , DECODE(T.CUR_OPE_NO ,T.OPE_NO,'当站','Coming') AS WIP_CATEGORY
+            , TO_CHAR(T.FCST_TIME, 'YYYY-MM-DD HH24:MM:SS') AS FCST_TIME
+            , T.FCST_SHIFT_DATE
+            , T.CLOSE_HOUR
+            , T.SGS_GROUP
+            , T.SGS_EQP
+            , T.MAINPD_ID
+            , T.STD_CT_END
+            , T.MIN_STD_TIME
+            , T.SGS_FIRST_OP
+            , T.INLINE_CYC_ACC
+            , TO_NUMBER(B.LOT_PRIORITY) AS LOT_PRIORITY
+            FROM A1MFG.PR_SGS_EQP_WIP T
+            LEFT JOIN PWEB.A3_LOT_PRIORITY B ON T.PRODG1 = B.PRODG1 AND T.LOT_ID =B.LOT_ID
+            WHERE 1=1
+            AND T.SGS_EQP = #{eqpid}
+            <include refid="typeCondition"/>
+
+            <if test="tech != 'Total'">
+                AND T.TECH = #{tech}
+            </if>
+
+            <if test="openo != 'Total' and sgsgroup != 'Total'">
+                AND T.SGS_GROUP = #{sgsgroup}
+                AND T.OPE_NO = #{openo}
+            </if>
+            <if test="neng == 'all'">
+                AND T.NENG_FLAG LIKE '%'
+            </if>
+            <if test="neng != 'all'">
+                AND T.NENG_FLAG =#{neng}
+            </if>
+            )
+            SELECT A.LOCATION_FAB
+            , A.FAB
+            , A.TECH
+            , A.PRODG1
+            , A.PRODSPEC_ID
+            , A.LOT_ID
+            , A.WAFER_QTY
+            , A.NENG_FLAG
+            , A.LOT_PRIORITY
+            , A.LOT_PROC_STATE
+            , A.CUR_OPE_NO
+            , A.OPE_NO
+            , A.WIP_CATEGORY
+            , A.CLOSE_HOUR
+            , A.SGS_GROUP
+            , A.SGS_EQP
+            , A.FCST_SHIFT_DATE
+            , A.FCST_TIME
+            FROM LOT_DATA A
+            WHERE 1 = 1
+            AND A.WIP_CATEGORY ='当站'
+            ORDER BY A.PRODG1, A.CUR_OPE_NO
+        </if>
+
+        <if test="type != 'currentA1Wip' and type != 'currentA3Wip'">
+            WITH LOT_DATA AS (
+            SELECT T.TECH
+            , T.PRODG1
+            , T.PRODSPEC_ID
+            , T.LOCATION_FAB
+            , T.FAB
+            , T.LAYER
+            , T.NENG_FLAG
+            , T.LOT_ID
+            , T.WAFER_QTY
+            , T.LOT_PROC_STATE
+            , T.CUR_OPE_NO
+            , T.OPE_NO
+            , DECODE(T.CUR_OPE_NO ,T.OPE_NO,'当站','Coming') AS WIP_CATEGORY
+            , TO_CHAR(T.FCST_TIME, 'YYYY-MM-DD HH24:MM:SS') AS FCST_TIME
+            , T.FCST_SHIFT_DATE
+            , T.CLOSE_HOUR
+            , T.SGS_GROUP
+            , T.SGS_EQP
+            , T.MAINPD_ID
+            , T.STD_CT_END
+            , T.MIN_STD_TIME
+            , T.SGS_FIRST_OP
+            , T.INLINE_CYC_ACC
+            , TO_NUMBER(B.LOT_PRIORITY) AS LOT_PRIORITY
+            FROM A1MFG.PR_SGS_EQP_WIP T
+            LEFT JOIN PWEB.A3_LOT_PRIORITY B ON T.PRODG1 = B.PRODG1 AND T.LOT_ID =B.LOT_ID
+            WHERE 1=1
+            AND T.SGS_EQP = #{eqpid}
+            <include refid="typeCondition"/>
+
+            <if test="tech != 'Total'">
+                AND T.TECH = #{tech}
+            </if>
+
+            <if test="openo != 'Total' and sgsgroup != 'Total'">
+                AND T.SGS_GROUP = #{sgsgroup}
+                AND T.OPE_NO = #{openo}
+            </if>
+            <if test="neng == 'all'">
+                AND T.NENG_FLAG LIKE '%'
+            </if>
+            <if test="neng != 'all'">
+                AND T.NENG_FLAG =#{neng}
+            </if>
+            )
+            SELECT A.LOCATION_FAB
+            , A.FAB
+            , A.TECH
+            , A.PRODG1
+            , A.PRODSPEC_ID
+            , A.LOT_ID
+            , A.WAFER_QTY
+            , A.NENG_FLAG
+            , A.LOT_PRIORITY
+            , A.LOT_PROC_STATE
+            , A.CUR_OPE_NO
+            , A.OPE_NO
+            , A.WIP_CATEGORY
+            , A.CLOSE_HOUR
+            , A.SGS_GROUP
+            , A.SGS_EQP
+            , A.FCST_SHIFT_DATE
+            , A.FCST_TIME
+            FROM LOT_DATA A
+            WHERE 1 = 1
+            AND A.WIP_CATEGORY ='Coming'
+            ORDER BY A.PRODG1, A.CUR_OPE_NO
+        </if>
+
+
+    </select>
+
+    <select id="getEqpIdList" resultType="java.util.Map">
+        SELECT EQPID_LABEL, EQPID_VALUE
+        FROM (
+        SELECT DISTINCT SGS_EQP AS EQPID_LABEL
+        , SGS_EQP AS EQPID_VALUE
+        , CASE WHEN LENGTH(SGS_EQP) =5 THEN 'N1A1' ELSE 'N1A3' END AS FAB
+        FROM A1MFG.PR_SGS_EQP_WIP
+        )
+        WHERE FAB =#{fab}
+        ORDER BY EQPID_LABEL
+
+    </select>
+
+
+</mapper>

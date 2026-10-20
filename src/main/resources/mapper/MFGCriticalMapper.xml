@@ -1,0 +1,2445 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.MFGCriticalMapper">
+    <select id="getTechList" resultType="mfg.reporting.dto.CommonSelectDTO">
+        SELECT DISTINCT MFG_TECH label,MFG_TECH value
+        FROM A1MFG.PRODUCT_TECH_INFO A
+    </select>
+
+
+    <select id="getStdTechList" resultType="mfg.reporting.dto.CommonSelectDTO">
+        SELECT DISTINCT GROUP_TECH label,GROUP_TECH value
+        FROM A1MFG.PRODUCT_TECH_INFO A
+    </select>
+
+
+    <select id="getRealModuleList" resultType="mfg.reporting.dto.CommonSelectDTO">
+        SELECT DISTINCT
+        REAL_MODULE label,
+        REAL_MODULE value
+        FROM PWEB.EQP_ID_USE_STD A
+        WHERE
+        ACTIVE_FLAG = 'Y'
+        AND #{fab,jdbcType=VARCHAR} IN ('N1','N1A1')
+        UNION
+        SELECT DISTINCT
+        REAL_MODULE label,
+        REAL_MODULE value
+        FROM PWEB.EQP_ID_USE_STD_A3 A
+        WHERE
+        ACTIVE_FLAG = 'Y'
+        AND #{fab,jdbcType=VARCHAR} IN ('N1A3','N1')
+    </select>
+
+
+    <select id="getEqpgList" resultType="mfg.reporting.dto.CommonSelectDTO">
+        SELECT EQP_G label,EQP_G value FROM(
+        SELECT
+        A.EQP_G,
+        CASE WHEN B.MODULE IS NOT NULL THEN B.MODULE
+        WHEN A.MODULE IN('FA', 'INT','Measurement') THEN 'METRO'
+        ELSE A.MODULE END MODULE
+        FROM(
+        SELECT DISTINCT EQP_G,MODULE
+        FROM PWEB.EQP_ID_USE_STD  WHERE ACTIVE_FLAG = 'Y'AND #{fab,jdbcType=VARCHAR} IN ('N1','N1A1')
+        )A LEFT JOIN (
+        SELECT KEY1 MODULE,KEY2 EQP_G FROM A1_MFG.CRITICLE_COMMENT_SUMMARY@TO_A3MFG B WHERE FUNCTION_NAME ='EQPG MODULE'
+        )B
+        ON A.EQP_G = B.EQP_G
+        UNION
+        SELECT
+        A.EQP_G,
+        CASE WHEN B.MODULE IS NOT NULL THEN B.MODULE
+        WHEN A.MODULE IN('FA', 'INT','Measurement') THEN 'METRO'
+        ELSE A.MODULE END MODULE
+        FROM(
+        SELECT DISTINCT EQP_G,MODULE
+        FROM PWEB.EQP_ID_USE_STD_A3  WHERE ACTIVE_FLAG = 'Y'AND #{fab,jdbcType=VARCHAR} IN ('N1','N1A3')
+        )A LEFT JOIN (
+        SELECT KEY1 MODULE,KEY2 EQP_G FROM A1_MFG.CRITICLE_COMMENT_SUMMARY@TO_A3MFG B WHERE FUNCTION_NAME ='EQPG MODULE'
+        )B
+        ON A.EQP_G = B.EQP_G
+        ) WHERE 1=1
+        <if test="module != null and module != '' and module != 'all'">
+            AND MODULE = #{module,jdbcType=VARCHAR}
+        </if>
+    </select>
+
+    <select id="getLpHealthChart" resultType="map">
+        WITH DATE_DATA AS (
+        SELECT A.SHIFT_YEAR, A.SHIFT_MONTH, A.SHIFT_DATE, B.MFG_MODULE
+        FROM (
+        SELECT DISTINCT SUBSTR(A.SHIFT_DATE,0,4) AS SHIFT_YEAR,SUBSTR(A.SHIFT_DATE,0,6) AS SHIFT_MONTH, A.SHIFT_DATE
+        FROM A3MFGYW1.CLIP_CALENDAR A
+        WHERE A.SHIFT_MONTH &gt;=TO_CHAR(ADD_MONTHS(TRUNC(SYSDATE-7.5/24, 'MM'), -11), 'YYYYMM')
+        AND A.SHIFT_DATE &lt;=TO_CHAR(SYSDATE-7.5/24, 'YYYYMMDD')
+        AND A.SHIFT_DATE &gt;= '20260101'
+        )A
+        JOIN (SELECT DISTINCT MFG_MODULE FROM A1_MFG.PH_EQP_PORT_SUMMARY WHERE FAB_PHASE =#{fab}) B ON 1=1
+        )
+        , RAW_DATA AS (
+        --历史一年数据
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_DATE
+        , A.FAB_PHASE
+        , A.MFG_MODULE
+        , SUM(SEFA_COUNT) AS SEFA_COUNT
+        FROM A1_MFG.PH_EQP_PORT_SUMMARY A
+        WHERE A.FAB_PHASE =#{fab}
+        AND A.SHIFT_MONTH &gt;=TO_CHAR(ADD_MONTHS(TRUNC(SYSDATE-7.5/24, 'MM'), -11), 'YYYYMM')
+        GROUP BY A.SHIFT_YEAR, A.SHIFT_MONTH, A.SHIFT_DATE, A.FAB_PHASE, A.MFG_MODULE
+        UNION ALL
+        --实时
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_DATE
+        , A.FAB_PHASE
+        , A.MFG_MODULE
+        , COUNT(1) AS SEFA_COUNT
+        FROM A1_MFG.V_PR_EQP_PORT A
+        WHERE A.FAB_PHASE =#{fab}
+        GROUP BY A.SHIFT_YEAR, A.SHIFT_MONTH, A.SHIFT_DATE, A.FAB_PHASE, A.MFG_MODULE
+        )
+        , SUMMARY_DATA AS (
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_DATE
+        , B.FAB_PHASE
+        , A.MFG_MODULE
+        , CASE WHEN A.SHIFT_DATE &gt;='20251224' THEN NVL(B.SEFA_COUNT,0) ELSE B.SEFA_COUNT END AS SEFA_COUNT
+        FROM DATE_DATA A
+        LEFT JOIN RAW_DATA B ON A.SHIFT_DATE =B.SHIFT_DATE AND A.MFG_MODULE =B.MFG_MODULE
+        ORDER BY A.SHIFT_DATE
+        )
+        , FINAL_DATA AS (
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_MONTH AS SHIFT_DATE
+        , A.MFG_MODULE
+        , ROUND(AVG(SEFA_COUNT),0) AS SEFA_COUNT
+        , 1 AS SEQ_NO
+        FROM SUMMARY_DATA A
+        GROUP BY A.SHIFT_YEAR, A.SHIFT_MONTH, A.MFG_MODULE
+        UNION ALL
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_DATE
+        , A.MFG_MODULE
+        , A.SEFA_COUNT
+        , 2 AS SEQ_NO
+        FROM SUMMARY_DATA A
+        WHERE A.SHIFT_DATE &lt;=TO_CHAR (SYSDATE-7.5/24,'YYYYMMDD')
+        AND A.SHIFT_DATE &gt;=TO_CHAR (SYSDATE-7.5/24-29,'YYYYMMDD')
+        )
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_DATE
+        , A.MFG_MODULE
+        , A.SEFA_COUNT
+        , CASE WHEN SHIFT_DATE = A.SHIFT_MONTH THEN A.SEFA_COUNT END AS MONTH_SEFA_COUNT
+        , CASE WHEN SHIFT_DATE &lt;&gt; A.SHIFT_MONTH THEN A.SEFA_COUNT END AS DATE_SEFA_COUNT
+        , A.SEQ_NO
+        FROM FINAL_DATA A
+        ORDER BY A.SEQ_NO, A.SHIFT_DATE, A.MFG_MODULE
+    </select>
+
+    <select id="getLpHealthChartSummaryByEQPG" resultType="map">
+        WITH RAW_DATA AS (
+        --历史一年数据
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_DATE
+        , A.FAB_PHASE
+        , A.MFG_MODULE
+        , A.EQP_G
+        , SEFA_COUNT
+        FROM A1_MFG.PH_EQP_PORT_SUMMARY A
+        WHERE A.FAB_PHASE =#{fab}
+        AND A.MFG_MODULE =#{module}
+        AND A.SHIFT_MONTH &gt;=TO_CHAR(ADD_MONTHS(TRUNC(SYSDATE-7.5/24, 'MM'), -11), 'YYYYMM')
+        UNION ALL
+        --实时
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_DATE
+        , A.FAB_PHASE
+        , A.MFG_MODULE
+        , A.EQP_G
+        , COUNT(1) AS SEFA_COUNT
+        FROM A1_MFG.V_PR_EQP_PORT A
+        WHERE A.FAB_PHASE =#{fab}
+        AND A.MFG_MODULE =#{module}
+        GROUP BY A.SHIFT_YEAR, A.SHIFT_MONTH, A.SHIFT_DATE, A.FAB_PHASE, A.MFG_MODULE, A.EQP_G
+        )
+        , DATE_DATA AS (
+        SELECT DISTINCT A.SHIFT_YEAR, A.SHIFT_MONTH, A.SHIFT_DATE, B.MFG_MODULE, B.EQP_G
+        FROM (
+        SELECT DISTINCT SUBSTR(A.SHIFT_DATE,0,4) AS SHIFT_YEAR,SUBSTR(A.SHIFT_DATE,0,6) AS SHIFT_MONTH, A.SHIFT_DATE
+        FROM A3MFGYW1.CLIP_CALENDAR A
+        WHERE A.SHIFT_DATE &gt;=TO_CHAR(ADD_MONTHS(TRUNC(SYSDATE-7.5/24, 'MM'), -11), 'YYYYMMDD')
+        AND A.SHIFT_DATE &lt;=TO_CHAR(SYSDATE-7.5/24, 'YYYYMMDD')
+        AND A.SHIFT_DATE &gt;= '20260101'
+        )A
+        JOIN (
+        SELECT DISTINCT A.MFG_MODULE, A.EQP_G
+        FROM RAW_DATA A
+        ) B ON 1=1
+        )
+        , SUMMARY_DATA AS (
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_DATE
+        , A.MFG_MODULE
+        , A.EQP_G
+        , CASE WHEN A.SHIFT_DATE &gt;='20251224' THEN NVL(B.SEFA_COUNT,0) ELSE B.SEFA_COUNT END AS SEFA_COUNT
+        FROM DATE_DATA A
+        LEFT JOIN RAW_DATA B ON A.SHIFT_DATE = B.SHIFT_DATE AND A.EQP_G =B.EQP_G
+        )
+        , FINAL_DATA AS (
+        --by月
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_MONTH AS SHIFT_DATE
+        , A.MFG_MODULE
+        , A.EQP_G
+        , CEIL(AVG(SEFA_COUNT)) AS SEFA_COUNT
+        FROM SUMMARY_DATA A
+        GROUP BY A.SHIFT_YEAR, A.SHIFT_MONTH, A.EQP_G , A.MFG_MODULE
+        UNION ALL
+        --by天
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_DATE
+        , A.MFG_MODULE
+        , A.EQP_G
+        , SUM(A.SEFA_COUNT) AS SEFA_COUNT
+        FROM SUMMARY_DATA A
+        WHERE A.SHIFT_DATE &lt;=TO_CHAR (SYSDATE-7.5/24,'YYYYMMDD')
+        AND A.SHIFT_DATE &gt;=TO_CHAR (SYSDATE-7.5/24-29,'YYYYMMDD')
+        GROUP BY A.SHIFT_YEAR, A.SHIFT_MONTH, A.EQP_G , A.MFG_MODULE, A.SHIFT_DATE
+        )
+        , EQP_DATA AS (
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_DATE
+        , A.MFG_MODULE
+        , A.EQP_G
+        , A.SEFA_COUNT
+        , 1 AS SEQ_NO
+        FROM FINAL_DATA A
+        UNION ALL
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_DATE
+        , A.MFG_MODULE
+        , 'TOTAL' AS EQP_G
+        , SUM(A.SEFA_COUNT) AS SEFA_COUNT
+        , 2 AS SEQ_NO
+        FROM FINAL_DATA A
+        GROUP BY A.SHIFT_YEAR, A.SHIFT_MONTH, A.MFG_MODULE, A.SHIFT_DATE
+        )
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_DATE
+        , A.MFG_MODULE
+        ,CASE WHEN A.EQP_G = 'TOTAL' THEN 'TOTAL' ELSE A.EQP_G END AS EQP_G
+        , A.EQP_G
+        , A.SEFA_COUNT
+        , A.SEQ_NO
+        FROM EQP_DATA A
+        ORDER BY LENGTH(SHIFT_DATE), A.SHIFT_DATE, A.SEQ_NO
+    </select>
+
+
+    <select id="getLpHealthChartDetailDaily" resultType="map">
+        SELECT C.*,D.F_COMMENT  FROM(
+        WITH EQP_FILTER_DATA AS (
+        SELECT DISTINCT A.SHIFT_DATE
+        , B.EQP_ID
+        , A.PORT_ID
+        FROM (
+        SELECT SHIFT_DATE
+        , KEY1 AS EQP_ID
+        , KEY2 AS PORT_ID
+        , KEY3 AS FAB
+        , KEY4 AS MODULE
+        FROM A1_MFG.CRITICLE_COMMENT_SUMMARY_HS S
+        WHERE FUNCTION_NAME = 'LP Monitor Filter'
+        )A
+        JOIN (
+        SELECT DISTINCT #{fab} AS FAB
+        , EQP_ID
+        FROM PWEB.EQP_ID_USE_STD@A1PDW
+        WHERE LENGTH(EQP_ID) = 5
+        UNION ALL
+        SELECT DISTINCT 'N1A3' AS FAB
+        , EQP_ID
+        FROM PWEB.EQP_ID_USE_STD@A3PDW
+        WHERE LENGTH(EQP_ID) = 6
+        ) B ON A.FAB = B.FAB AND INSTR(B.EQP_ID, A.EQP_ID) > 0
+        )
+        SELECT A.FAB_PHASE
+        , A.SHIFT_DATE
+        , A.MFG_MODULE MODULE
+        , A.EQP_G
+        , A.EQP_ID
+        , A.PORT_ID
+        , A.MCOPEMODE_ID OPE_MODE
+        , A.CLAIM_TIME
+        , ROUND((A.UPDATE_TIME-A.CLAIM_TIME )*24,2) AS DUR
+        , A.UPDATE_TIME
+        FROM A1_MFG.PH_EQP_PORT A
+        WHERE A.FAB_PHASE =#{fab}
+        AND A.MFG_MODULE =#{module}
+        <if test="eqpg !='TOTAL'">
+            AND A.EQP_G = #{eqpg}
+        </if>
+        <if test="shiftDate != null and shiftDate != ''">
+            <choose>
+                <when test="shiftDate.length() > 6">
+                    AND A.SHIFT_DATE = #{shiftDate}
+                </when>
+                <otherwise>
+                    AND A.SHIFT_MONTH = #{shiftDate}
+                </otherwise>
+            </choose>
+        </if>
+        AND NOT EXISTS (
+        SELECT 1 FROM EQP_FILTER_DATA C
+        WHERE A.SHIFT_DATE = C.SHIFT_DATE
+        AND A.EQP_ID = C.EQP_ID
+        AND A.PORT_ID = C.PORT_ID
+        )
+        UNION ALL
+        SELECT A.FAB_PHASE
+        , A.SHIFT_DATE
+        , A.MFG_MODULE
+        , A.EQP_G
+        , A.EQP_ID
+        , A.PORT_ID
+        , A.MCOPEMODE_ID
+        , A.CLAIM_TIME
+        , ROUND((SYSDATE-A.CLAIM_TIME )*24,2) AS DUR
+        , SYSDATE AS UPDATE_TIME
+        FROM A1_MFG.V_PR_EQP_PORT A
+        WHERE A.FAB_PHASE =#{fab}
+        AND A.MFG_MODULE =#{module}
+        <if test="eqpg !='TOTAL'">
+            AND A.EQP_G = #{eqpg}
+        </if>
+        <if test="shiftDate != null and shiftDate != ''">
+            <choose>
+                <when test="shiftDate.length() > 6">
+                    AND A.SHIFT_DATE = #{shiftDate}
+                </when>
+                <otherwise>
+                    AND A.SHIFT_MONTH = #{shiftDate}
+                </otherwise>
+            </choose>
+        </if>
+        )C LEFT JOIN (
+        SELECT KEY1 EQP_ID,KEY2 PORT_ID,TO_DATE(KEY3,'YYYY-MM-DD HH24:MI:SS') CLAIM_TIME,F_COMMENT FROM  A1_MFG.COMMENT_SUMMARY
+        WHERE FUNCTION_NAME = 'lpHealthDetailComment'
+        )D
+        ON C.EQP_ID = D.EQP_ID AND C.PORT_ID = D.PORT_ID AND C.CLAIM_TIME = D.CLAIM_TIME
+    </select>
+
+
+    <select id="getEqpList" resultType="mfg.reporting.dto.CommonSelectDTO">
+        SELECT EQP_ID label,EQP_ID value FROM(
+        SELECT
+        A.EQP_G,A.EQP_ID,
+        CASE WHEN B.MODULE IS NOT NULL THEN B.MODULE
+        WHEN A.MODULE IN('FA', 'INT','Measurement') THEN 'METRO'
+        ELSE A.MODULE END MODULE
+        FROM(
+        SELECT DISTINCT EQP_G,EQP_ID,MODULE
+        FROM PWEB.EQP_ID_USE_STD  WHERE LENGTH(EQP_ID)=5 AND ACTIVE_FLAG = 'Y' AND #{fab,jdbcType=VARCHAR} IN ('N1','N1A1')
+        )A LEFT JOIN (
+        SELECT KEY1 MODULE,KEY2 EQP_G FROM A1_MFG.CRITICLE_COMMENT_SUMMARY@TO_A3MFG B WHERE FUNCTION_NAME ='EQPG MODULE'
+        )B
+        ON A.EQP_G = B.EQP_G
+        UNION
+        SELECT
+        A.EQP_G,A.EQP_ID,
+        CASE WHEN B.MODULE IS NOT NULL THEN B.MODULE
+        WHEN A.MODULE IN('FA', 'INT','Measurement') THEN 'METRO'
+        ELSE A.MODULE END MODULE
+        FROM(
+        SELECT DISTINCT EQP_G,EQP_ID,MODULE
+        FROM PWEB.EQP_ID_USE_STD_A3  WHERE LENGTH(EQP_ID)=6 AND ACTIVE_FLAG = 'Y' AND #{fab,jdbcType=VARCHAR} IN ('N1','N1A3')
+        )A LEFT JOIN (
+        SELECT KEY1 MODULE,KEY2 EQP_G FROM A1_MFG.CRITICLE_COMMENT_SUMMARY@TO_A3MFG B WHERE FUNCTION_NAME ='EQPG MODULE'
+        )B
+        ON A.EQP_G = B.EQP_G
+        ) WHERE 1=1
+        <if test="module != null and module != '' and module != 'all'">
+            AND MODULE = #{module,jdbcType=VARCHAR}
+        </if>
+        <if test="eqpg != null and eqpg != '' and eqpg != 'all'">
+            AND EQP_G = #{eqpg,jdbcType=VARCHAR}
+        </if>
+    </select>
+
+    <select id="getDYBChart" resultType="map">
+        WITH DATE_DATA AS (
+        SELECT A.SHIFT_YEAR, A.SHIFT_MONTH, A.SHIFT_DATE, B.MFG_MODULE
+        FROM (
+        SELECT DISTINCT SUBSTR(A.SHIFT_DATE,0,4) AS SHIFT_YEAR,SUBSTR(A.SHIFT_DATE,0,6) AS SHIFT_MONTH, SUBSTR(A.SHIFT_DATE,0,6) AS SHIFT_DATE
+        FROM A3MFGYW1.CLIP_CALENDAR A
+        WHERE A.SHIFT_MONTH &gt;=TO_CHAR(ADD_MONTHS(TRUNC(SYSDATE-7.5/24, 'MM'), -10), 'YYYYMM')
+        AND A.SHIFT_DATE &lt;=TO_CHAR(SYSDATE-7.5/24-1, 'YYYYMMDD')
+        AND A.SHIFT_DATE &gt;= '20260101'
+        UNION ALL
+        SELECT DISTINCT SUBSTR(A.SHIFT_DATE,0,4) AS SHIFT_YEAR,SUBSTR(A.SHIFT_DATE,0,6) AS SHIFT_MONTH, A.SHIFT_DATE
+        FROM A3MFGYW1.CLIP_CALENDAR A
+        WHERE A.SHIFT_DATE &gt;=TO_CHAR(SYSDATE-7.5/24-30, 'YYYYMMDD')
+        AND A.SHIFT_DATE &lt;=TO_CHAR(SYSDATE-7.5/24-1, 'YYYYMMDD')
+        AND A.SHIFT_DATE &gt;= '20260101'
+        )A
+        JOIN (SELECT DISTINCT MFG_MODULE FROM A1_MFG.PH_MOVE_HISTORY_SUMMARY WHERE FAB_PHASE =#{fab}) B ON 1=1
+        )
+        , RAW_DATA AS (
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_DATE
+        , A.FAB_PHASE
+        , A.MFG_MODULE
+        , SUM(TTL_MOVE) AS TTL_MOVE
+        , SUM(DYB_MOVE) AS DYB_MOVE
+        , SUM(DYB_MOVE)/SUM(TTL_MOVE) AS DYB_RATIO
+        FROM A1_MFG.PH_MOVE_HISTORY_SUMMARY A
+        WHERE A.FAB_PHASE =#{fab}
+        AND A.SHIFT_MONTH &gt;=TO_CHAR(ADD_MONTHS(TRUNC(SYSDATE-7.5/24, 'MM'), -11), 'YYYYMM')
+        GROUP BY A.SHIFT_YEAR, A.SHIFT_MONTH, A.SHIFT_DATE, A.FAB_PHASE, A.MFG_MODULE
+        )
+        , SUMMARY_DATA AS (
+        --by月
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH AS SHIFT_DATE
+        , A.FAB_PHASE
+        , A.MFG_MODULE
+        , ROUND(SUM(DYB_MOVE)/SUM(TTL_MOVE)*100,2) AS DYB_RATIO
+        FROM RAW_DATA A
+        GROUP BY A.SHIFT_YEAR, A.SHIFT_MONTH, A.FAB_PHASE, A.MFG_MODULE
+        UNION ALL
+        --by天
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_DATE
+        , A.FAB_PHASE
+        , A.MFG_MODULE
+        , ROUND(A.DYB_RATIO*100,2) AS DYB_RATIO
+        FROM RAW_DATA A
+        WHERE A.SHIFT_DATE &lt;=TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        AND A.SHIFT_DATE &gt;=TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD')
+        )
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_DATE
+        , A.MFG_MODULE
+        , B.DYB_RATIO
+        , CASE WHEN A.SHIFT_DATE = A.SHIFT_MONTH THEN  DYB_RATIO END AS MONTH_DYB_RATIO
+        , CASE WHEN A.SHIFT_DATE &lt;&gt;A.SHIFT_MONTH THEN  DYB_RATIO END AS DATE_DYB_RATIO
+        FROM DATE_DATA A
+        LEFT JOIN SUMMARY_DATA B ON A.SHIFT_DATE = B.SHIFT_DATE AND A.MFG_MODULE= B.MFG_MODULE
+        ORDER BY LENGTH(SHIFT_DATE), A.SHIFT_DATE
+    </select>
+
+    <select id="getDybChartSummaryByeqpg" resultType="map">
+        WITH DATE_DATA AS (
+        SELECT DISTINCT A.SHIFT_YEAR, A.SHIFT_MONTH, A.SHIFT_DATE, B.MFG_MODULE, B.EQP_G
+        FROM (
+        SELECT DISTINCT SUBSTR(A.SHIFT_DATE,0,4) AS SHIFT_YEAR,SUBSTR(A.SHIFT_DATE,0,6) AS SHIFT_MONTH, SUBSTR(A.SHIFT_DATE,0,6) AS SHIFT_DATE
+        FROM A3MFGYW1.CLIP_CALENDAR A
+        WHERE A.SHIFT_MONTH &gt;=TO_CHAR(ADD_MONTHS(TRUNC(SYSDATE-7.5/24, 'MM'), -10), 'YYYYMM')
+        AND A.SHIFT_DATE &lt;=TO_CHAR(SYSDATE-7.5/24-1, 'YYYYMMDD')
+        AND A.SHIFT_DATE &gt;= '20260101'
+        UNION ALL
+        SELECT DISTINCT SUBSTR(A.SHIFT_DATE,0,4) AS SHIFT_YEAR,SUBSTR(A.SHIFT_DATE,0,6) AS SHIFT_MONTH, A.SHIFT_DATE
+        FROM A3MFGYW1.CLIP_CALENDAR A
+        WHERE A.SHIFT_DATE &gt;=TO_CHAR(SYSDATE-7.5/24-30, 'YYYYMMDD')
+        AND A.SHIFT_DATE &lt;=TO_CHAR(SYSDATE-7.5/24-1, 'YYYYMMDD')
+        AND A.SHIFT_DATE &gt;= '20260101'
+        )A
+        JOIN (
+        SELECT DISTINCT A.MFG_MODULE, A.EQP_G
+        FROM A1_MFG.PH_MOVE_HISTORY_SUMMARY A
+        WHERE A.SHIFT_MONTH &gt;=TO_CHAR(ADD_MONTHS(TRUNC(SYSDATE-7.5/24, 'MM'), -11), 'YYYYMM')
+        AND A.FAB_PHASE =#{fab}
+        AND A.MFG_MODULE =#{module}
+        UNION ALL
+        SELECT #{module} AS MFG_MODULE, 'TOTAL' AS EQP_G FROM DUAL
+        ) B ON 1=1
+        )
+        , RAW_DATA AS (
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_DATE
+        , A.FAB_PHASE
+        , A.MFG_MODULE
+        , A.EQP_G
+        , SUM(A.TTL_MOVE) AS TTL_MOVE
+        , SUM(A.DYB_MOVE) AS DYB_MOVE
+        , SUM(A.DYB_MOVE)/SUM(A.TTL_MOVE) AS DYB_RATIO
+        FROM A1_MFG.PH_MOVE_HISTORY_SUMMARY A
+        WHERE A.SHIFT_MONTH &gt;=TO_CHAR(ADD_MONTHS(TRUNC(SYSDATE-7.5/24, 'MM'), -11), 'YYYYMM')
+        AND A.FAB_PHASE =#{fab}
+        AND A.MFG_MODULE =#{module}
+        GROUP BY A.SHIFT_YEAR, A.SHIFT_MONTH, A.SHIFT_DATE, A.FAB_PHASE, A.MFG_MODULE, A.EQP_G
+        )
+        , SUMMARY_DATA AS (
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH AS SHIFT_DATE
+        , A.FAB_PHASE
+        , A.MFG_MODULE
+        , A.EQP_G
+        , SUM(A.TTL_MOVE) AS TTL_MOVE
+        , SUM(A.DYB_MOVE) AS DYB_MOVE
+        , ROUND(SUM(A.DYB_MOVE)/SUM(A.TTL_MOVE)*100,2) AS DYB_RATIO
+        FROM RAW_DATA A
+        GROUP BY A.SHIFT_YEAR, A.SHIFT_MONTH, A.FAB_PHASE, A.MFG_MODULE, A.EQP_G
+        UNION ALL
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_DATE
+        , A.FAB_PHASE
+        , A.MFG_MODULE
+        , A.EQP_G
+        , A.TTL_MOVE
+        , A.DYB_MOVE
+        , ROUND(A.DYB_RATIO*100,2) AS DYB_RATIO
+        FROM RAW_DATA A
+        WHERE A.SHIFT_DATE &lt;= TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        AND A.SHIFT_DATE &gt;= TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD')
+        )
+        , FINAL_DATA AS (
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_DATE
+        , A.FAB_PHASE
+        , A.MFG_MODULE
+        , A.EQP_G
+        , A.TTL_MOVE
+        , A.DYB_MOVE
+        , A.DYB_RATIO
+        FROM SUMMARY_DATA A
+        UNION ALL
+        -- 汇总数据
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_DATE
+        , A.FAB_PHASE
+        , A.MFG_MODULE
+        , 'TOTAL' AS EQP_G
+        , SUM(A.TTL_MOVE) AS TTL_MOVE
+        , SUM(A.DYB_MOVE) AS DYB_MOVE
+        , ROUND(SUM(A.DYB_MOVE)/SUM(A.TTL_MOVE)*100,2) AS DYB_RATIO
+        FROM SUMMARY_DATA A
+        GROUP BY A.SHIFT_YEAR, A.SHIFT_DATE, A.FAB_PHASE, A.MFG_MODULE
+        )
+        SELECT A.SHIFT_YEAR
+        , A.SHIFT_MONTH
+        , A.SHIFT_DATE
+        , A.MFG_MODULE
+        , A.EQP_G
+        , B.TTL_MOVE
+        , B.DYB_MOVE
+        , B.DYB_RATIO
+        FROM DATE_DATA A
+        LEFT JOIN FINAL_DATA B ON A.SHIFT_DATE = B.SHIFT_DATE AND A.EQP_G =B.EQP_G
+        ORDER BY LENGTH(SHIFT_DATE), A.SHIFT_DATE, CASE WHEN A.EQP_G ='TOTAL' THEN 2 ELSE 1 END
+    </select>
+
+    <select id="getDYBChartDetailDaily" resultType="map">
+        SELECT A.FAB_PHASE
+        , A.SHIFT_DATE
+        , A.MFG_MODULE
+        , A.EQP_G
+        , A.EQP_ID
+        , A.TTL_MOVE
+        , A.DYB_MOVE
+        ,CASE WHEN A.TTL_MOVE &gt; 0 THEN ROUND(A.DYB_MOVE/A.TTL_MOVE*100,2) ELSE 0 END AS DYB_RATIO
+        FROM A1_MFG.PH_MOVE_HISTORY_SUMMARY A
+        WHERE A.FAB_PHASE =#{fab}
+        AND A.MFG_MODULE =#{module}
+        AND A.EQP_G =#{eqpg}
+        <if test="shiftDate != null and shiftDate != ''">
+            <choose>
+                <when test="shiftDate.length() > 6">
+                    AND A.SHIFT_DATE = #{shiftDate}
+                </when>
+                <otherwise>
+                    AND A.SHIFT_MONTH = #{shiftDate}
+                </otherwise>
+            </choose>
+        </if>
+ORDER BY A.DYB_MOVE  DESC
+    </select>
+
+    <select id="getQSRatioChart" resultType="map">
+        SELECT
+        LOACTION,SHIFT_DATE,DEPT_ID,DEPT_QTY
+        FROM(
+        SELECT LOACTION, SHIFT_DATE, DEPT_ID, DEPT_QTY FROM A3MFGYW1.QS_BY_MODULE T
+        WHERE T.SHIFT_DATE  BETWEEN TO_CHAR(SYSDATE-30,'YYYYMMDD') AND TO_CHAR(SYSDATE-8/24-1,'YYYYMMDD')
+        UNION ALL
+        SELECT T.LOACTION,T.SHIFT_DATE,'INLINE' AS DEPT_ID,MAX(T.IN_LINE_QTY) DEPT_ID FROM  A3MFGYW1.QS_BY_MODULE T
+        WHERE T.SHIFT_DATE  BETWEEN TO_CHAR(SYSDATE-30,'YYYYMMDD') AND TO_CHAR(SYSDATE-8/24-1,'YYYYMMDD')
+        GROUP BY T.LOACTION,T.SHIFT_DATE
+        )WHERE LOACTION =#{fab,jdbcType=VARCHAR}
+        ORDER BY SHIFT_DATE
+    </select>
+
+    <select id="getForceRatioTimeChart" resultType="map">
+        SELECT EQP_G,DEPT_ID,ROUND(SUM(MANUAL_TIME),1) MANUAL_TIME,SUM(RATIO) RATIO
+        FROM (
+        SELECT EQP_G,DEPT_ID DEPT_ID_ORG,RATIO,MANUAL_TIME,
+        CASE WHEN ROW_NUMBER()OVER(PARTITION BY EQP_G ORDER BY RATIO DESC)&gt;=4 THEN 'OTHER' ELSE DEPT_ID END DEPT_ID
+        FROM (
+        SELECT A1.EQP_G,A1.DEPT_ID,A2.STD_RUN_TIME,A1.MANUAL_TIME,
+        CASE WHEN A2.STD_RUN_TIME&gt;0 THEN ROUND(100*A1.MANUAL_TIME/A2.STD_RUN_TIME,2) END RATIO
+        FROM (
+        --根据下拉框选泽FORCE_TIME、DM_MEA_TIME、DYB_TIME
+        SELECT EQP_G,DEPT_ID
+        <if test="type =='FORCE_TIME'">
+            ,SUM(FORCE_TIME)/7
+        </if>
+        <if test="type =='DM_MEA_TIME'">
+            ,SUM(DM_MEA_TIME)/7
+        </if>
+        <if test="type =='DYB_TIME'">
+            ,SUM(DYB_TIME)/7
+        </if>
+        MANUAL_TIME
+        FROM A3MFGYW1.MEASUREMENT_EQP_G_FORCE
+        WHERE DEPT_ID IS NOT NULL
+        <if test="date =='pre3D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-3,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date =='pre14D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-14,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date =='pre30D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="fab !='' and fab != null and fab !='N1'">
+            AND FAB=#{fab,jdbcType=VARCHAR}
+        </if>
+        GROUP BY EQP_G,DEPT_ID
+        )A1,
+        (
+        SELECT EQP_G,SUM(STD_RUN_TIME)/7 STD_RUN_TIME
+        FROM (
+        SELECT FAB,EQP_G,SHIFT_DATE,MAX(STD_RUN_TIME) STD_RUN_TIME
+        FROM A3MFGYW1.MEASUREMENT_EQP_G_FORCE
+        WHERE 1=1
+        <if test="date =='pre3D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-3,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date =='pre14D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-14,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date =='pre30D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="fab !='' and fab != null and fab !='N1'">
+            AND FAB=#{fab,jdbcType=VARCHAR}
+        </if>
+        GROUP BY FAB,EQP_G,SHIFT_DATE
+        )
+        GROUP BY EQP_G
+        )A2
+        WHERE A1.EQP_G=A2.EQP_G(+)
+        UNION ALL
+        SELECT X1.EQP_G,'INLINE' DEPT_ID,X1.STD_RUN_TIME,X1.STD_RUN_TIME-X2.MANUAL_TIME INLINE_TIME,
+        CASE WHEN X1.STD_RUN_TIME&gt;0 THEN ROUND(100*(X1.STD_RUN_TIME-X2.MANUAL_TIME)/X1.STD_RUN_TIME,2) END RATIO
+        FROM (
+        SELECT EQP_G,SUM(STD_RUN_TIME)/7 STD_RUN_TIME
+        FROM (
+        SELECT FAB,EQP_G,SHIFT_DATE,MAX(STD_RUN_TIME) STD_RUN_TIME
+        FROM A3MFGYW1.MEASUREMENT_EQP_G_FORCE
+        WHERE 1=1
+        <if test="date =='pre3D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-3,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date =='pre14D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-14,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date =='pre30D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="fab !='' and fab != null and fab !='N1'">
+            AND FAB=#{fab,jdbcType=VARCHAR}
+        </if>
+        GROUP BY FAB,EQP_G,SHIFT_DATE
+        )
+        GROUP BY EQP_G
+        )X1,
+        (
+        SELECT EQP_G,SUM(FORCE_TIME+DM_MEA_TIME+DYB_TIME)/7 MANUAL_TIME
+        FROM A3MFGYW1.MEASUREMENT_EQP_G_FORCE
+        WHERE DEPT_ID IS NOT NULL
+        <if test="date =='pre3D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-3,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date =='pre14D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-14,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date =='pre30D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="fab !='' and fab != null and fab !='N1'">
+            AND FAB=#{fab,jdbcType=VARCHAR}
+        </if>
+        GROUP BY EQP_G
+        )X2
+        WHERE X1.EQP_G=X2.EQP_G
+        )
+        )
+        GROUP BY EQP_G,DEPT_ID
+    </select>
+
+    <select id="getForceRatioBatchChart" resultType="map">
+        SELECT EQP_G,DEPT_ID,ROUND(SUM(MANUAL_COUNT),1) MANUAL_COUNT,SUM(RATIO) RATIO
+        FROM (
+        SELECT EQP_G,DEPT_ID DEPT_ID_ORG,RATIO,MANUAL_COUNT,
+        CASE WHEN ROW_NUMBER()OVER(PARTITION BY EQP_G ORDER BY RATIO DESC)>=4 THEN 'OTHER' ELSE DEPT_ID END DEPT_ID
+        FROM (
+        SELECT A1.EQP_G,A1.DEPT_ID,A2.TOTAL_COUNT,A1.MANUAL_COUNT,
+        CASE WHEN A2.TOTAL_COUNT>0 THEN ROUND(100*A1.MANUAL_COUNT/A2.TOTAL_COUNT,2) END RATIO
+        FROM (
+        --根据下拉框选泽FORCE_COUNT、DM_MEA_COUNT、DYB_COUNT
+        SELECT EQP_G,DEPT_ID
+        <if test="type =='FORCE_TIME'">
+            ,SUM(FORCE_COUNT)/7
+        </if>
+        <if test="type =='DM_MEA_TIME'">
+            ,SUM(DM_MEA_COUNT)/7
+        </if>
+        <if test="type =='DYB_TIME'">
+            ,SUM(DYB_COUNT)/7
+        </if> MANUAL_COUNT
+        FROM A3MFGYW1.MEASUREMENT_EQP_G_FORCE
+        WHERE DEPT_ID IS NOT NULL
+        <if test="date =='pre3D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-3,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date =='pre14D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-14,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date =='pre30D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="fab !='' and fab != null and fab !='N1'">
+            AND FAB=#{fab,jdbcType=VARCHAR}
+        </if>
+        GROUP BY EQP_G,DEPT_ID
+        )A1,
+        (
+        SELECT EQP_G,SUM(TOTAL_COUNT)/7 TOTAL_COUNT
+        FROM A3MFGYW1.MEASUREMENT_EQP_G_FORCE
+        WHERE    1=1
+        <if test="date =='pre3D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-3,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date =='pre14D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-14,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date =='pre30D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="fab !='' and fab != null and fab !='N1'">
+            AND FAB=#{fab,jdbcType=VARCHAR}
+        </if>
+        GROUP BY EQP_G
+        )A2
+        WHERE A1.EQP_G=A2.EQP_G(+)
+        UNION ALL
+        SELECT X1.EQP_G,'INLINE' DEPT_ID,X1.TOTAL_COUNT,X1.TOTAL_COUNT-X2.MANUAL_COUNT INLINE_COUNT,
+        CASE WHEN X1.TOTAL_COUNT>0 THEN ROUND(100*(X1.TOTAL_COUNT-X2.MANUAL_COUNT)/X1.TOTAL_COUNT,2) END RATIO
+        FROM (
+        SELECT EQP_G,SUM(TOTAL_COUNT)/7 TOTAL_COUNT
+        FROM A3MFGYW1.MEASUREMENT_EQP_G_FORCE
+        WHERE 1=1
+        <if test="date =='pre3D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-3,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date =='pre14D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-14,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date =='pre30D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="fab !='' and fab != null and fab !='N1'">
+            AND FAB=#{fab,jdbcType=VARCHAR}
+        </if>
+        GROUP BY EQP_G
+        )X1,
+        (
+        SELECT EQP_G,SUM(FORCE_COUNT+DM_MEA_COUNT+DYB_COUNT)/7 MANUAL_COUNT
+        FROM A3MFGYW1.MEASUREMENT_EQP_G_FORCE
+        WHERE DEPT_ID IS NOT NULL
+        <if test="date =='pre3D'">
+        AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-3,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+    </if>
+        <if test="date =='pre14D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-14,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date =='pre30D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="fab !='' and fab != null and fab !='N1'">
+            AND FAB=#{fab,jdbcType=VARCHAR}
+        </if>
+        GROUP BY EQP_G
+        )X2
+        WHERE X1.EQP_G=X2.EQP_G
+        )
+        )
+        GROUP BY EQP_G,DEPT_ID
+    </select>
+
+    <select id="getForceRatioDetail" resultType="map">
+        SELECT A1.LOT_ID,A1.PRODG1,A1.OPE_NO,A1.FAB,A1.LOCATION,A1.COMPLETE_TIME,ROUND((A1.COMPLETE_TIME-A1.START_TIME)*24,2) RUN_TIME,
+        A1.EQP_ID,A2.CLAIM_USER_ID,A2.RUN_TYPE,A2.CLAIM_MEMO,NVL(A3.DEPT_ID,CLAIM_USER_ID) DEPT_ID
+        FROM A3MFGYW1.MOVE_SUMMARY A1,
+        A3MFGYW1.FORCE_DETAIL A2,
+        (
+        SELECT EMP_ID,MAX(DEPT_ID) DEPT_ID
+        FROM WORKFLOW.HR_USERS@A3PDW
+        GROUP BY EMP_ID
+        )A3
+        WHERE A1.LOT_ID=A2.LOT_ID AND A1.MAINPD_ID=A2.MAINPD_ID AND A1.OPE_NO=A2.OPE_NO AND A2.CLAIM_USER_ID=A3.EMP_ID(+)
+        AND A1.EQP_ID IS NOT NULL
+        <if test="eqpg !='' and eqpg != null">
+            and A1.EQP_G=#{eqpg,jdbcType=VARCHAR}
+        </if>
+        <if test="date =='pre3D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-3,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date =='pre14D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-14,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date =='pre30D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="type =='FORCE_TIME'">
+            AND A2.RUN_TYPE='Force'
+        </if>
+        <if test="type =='DM_MEA_TIME'">
+            AND A2.RUN_TYPE='Dynamics Measurement'
+        </if>
+        <if test="type =='DYB_TIME'">
+            AND A2.RUN_TYPE='DYB'
+        </if>
+        <if test="fab !='' and fab != null and fab !='N1'">
+            AND A1.LOCATION=#{fab,jdbcType=VARCHAR}
+        </if>
+    </select>
+
+    <select id="getMeasurementNgRatio" resultType="map">
+        SELECT EQP_G,ROUND(AVG(OK_COUNT)) OK_COUNT,ROUND(AVG(NG_COUNT)) NG_COUNT,ROUND(100*AVG(NG_COUNT)/AVG(TOTAL_COUNT),1) NG_RATIO
+        FROM (
+        SELECT EQP_G,SHIFT_DATE,SUM(TOTAL_COUNT) TOTAL_COUNT,SUM(TOTAL_COUNT-NG_COUNT) OK_COUNT,SUM(NG_COUNT) NG_COUNT
+        FROM A3MFGYW1.MEASUREMENT_EQP_G_NG
+        WHERE 1=1
+        <if test="date == 'pre30D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date == 'pre7D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-7,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date == 'pre3D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-3,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="fab !='' and fab != null and fab !='N1'">
+            AND FAB = #{fab,jdbcType=VARCHAR}
+        </if>
+        GROUP BY EQP_G,SHIFT_DATE
+        )
+        GROUP BY EQP_G
+    </select>
+
+    <select id="getMeasurementForceEqpGListByFab" resultType="mfg.reporting.dto.CommonSelectDTO">
+        SELECT DISTINCT EQP_G value,EQP_G label
+        FROM A3MFGYW1.MEASUREMENT_EQP_G_FORCE
+        WHERE 1=1
+        <if test="fab != null and fab !='' and fab != 'N1'">
+            AND FAB = #{fab,jdbcType=VARCHAR}
+        </if>
+    </select>
+
+    <select id="getMeasurementNgEqpGListByFab" resultType="mfg.reporting.dto.CommonSelectDTO">
+        SELECT DISTINCT EQP_G value,EQP_G label
+        FROM A3MFGYW1.MEASUREMENT_EQP_G_NG
+        WHERE 1=1
+        <if test="fab != null and fab !='' and fab != 'N1'">
+            AND FAB = #{fab,jdbcType=VARCHAR}
+        </if>
+    </select>
+
+    <select id="getLpFilterTableList" resultType="map">
+        SELECT
+        KEY1 EQP_ID,KEY2 PORT_ID,KEY3 FAB,KEY4 MODULE,F_COMMENT
+        FROM A1_MFG.CRITICLE_COMMENT_SUMMARY
+        WHERE FUNCTION_NAME = 'LP Monitor Filter'
+        <if test="module != 'all' and module != '' and module !=''">
+            AND KEY4 = #{module,jdbcType=VARCHAR}
+        </if>
+        <if test="fab != 'N1' and fab != '' and fab !=''">
+            AND KEY3 = #{fab,jdbcType=VARCHAR}
+        </if>
+    </select>
+
+    <select id="getDybTargetTableList" resultType="map">
+        SELECT
+        KEY1 MODULE,KEY2 TARGET,F_COMMENT
+        FROM A1_MFG.CRITICLE_COMMENT_SUMMARY
+        WHERE FUNCTION_NAME = 'DYB Move Monitor'
+        <if test="module != 'all' and module != '' and module !=''">
+            AND KEY1 = #{module,jdbcType=VARCHAR}
+        </if>
+    </select>
+
+    <select id="validDYBTargetInfo" resultType="map">
+        SELECT
+        KEY1
+        FROM A1_MFG.CRITICLE_COMMENT_SUMMARY
+        WHERE FUNCTION_NAME = 'DYB Move Monitor' AND (1!=1
+        <if test="MODULE != null and MODULE != '' and MODULE != 'all'">
+            OR ( KEY1 = #{MODULE,jdbcType=VARCHAR})
+        </if>
+        )
+    </select>
+
+    <insert id="insertDYBTargetInfo">
+        INSERT INTO A1_MFG.CRITICLE_COMMENT_SUMMARY(FUNCTION_NAME,KEY1,KEY2,F_COMMENT,UPDATE_USER,UPDATE_TIME)
+        VALUES('DYB Move Monitor',#{MODULE,jdbcType=VARCHAR},#{TARGET,jdbcType=INTEGER},#{F_COMMENT,jdbcType=VARCHAR},#{UPDATE_USER,jdbcType=VARCHAR},sysdate)
+    </insert>
+
+    <update id="updateDYBTargetInfo">
+        UPDATE A1_MFG.CRITICLE_COMMENT_SUMMARY
+        SET KEY2 =#{TARGET,jdbcType=INTEGER},UPDATE_USER = #{UPDATE_USER,jdbcType=VARCHAR},UPDATE_TIME = SYSDATE
+        WHERE FUNCTION_NAME ='DYB Move Monitor' AND KEY1 = #{MODULE,jdbcType=VARCHAR}
+    </update>
+
+    <select id="validLpFilterInfo" resultType="map">
+        SELECT
+        KEY1
+        FROM A1_MFG.CRITICLE_COMMENT_SUMMARY
+        WHERE FUNCTION_NAME = 'LP Monitor Filter'
+        AND (#{EQP_ID} LIKE CONCAT(CONCAT('%',KEY1),'%') OR KEY1 LIKE CONCAT(CONCAT('%',#{EQP_ID}),'%'))
+        AND KEY2 = #{PORT_ID}
+        AND KEY3 = #{FAB}
+    </select>
+
+
+    <select id="deleteLpFilterInfo">
+        DELETE  FROM A1_MFG.CRITICLE_COMMENT_SUMMARY
+        WHERE FUNCTION_NAME = 'LP Monitor Filter'
+        AND  KEY1 = #{EQP_ID}
+        AND KEY2 = #{PORT_ID}
+        AND KEY3 = #{FAB}
+    </select>
+
+    <select id="insertLpFilterInfo">
+        INSERT INTO A1_MFG.CRITICLE_COMMENT_SUMMARY(FUNCTION_NAME,KEY1,KEY2,KEY3,KEY4,UPDATE_USER,UPDATE_TIME)
+        SELECT
+        'LP Monitor Filter'FUNCTION_NAME,KEY1,KEY2,MAX(KEY3)KEY3,MAX(MODULE)KEY4,MAX(UPDATE_USER)UPDATE_USER ,SYSDATE UPDATE_TIME
+        FROM(
+        SELECT  #{EQP_ID} KEY1 ,#{PORT_ID} KEY2 ,#{FAB} KEY3,#{UPDATE_USER} UPDATE_USER FROM DUAL
+        )A
+        LEFT JOIN
+        (
+        SELECT A.EQP_ID,A.FAB
+        ,CASE WHEN B.MODULE IS NOT NULL THEN B.MODULE
+        WHEN A.MODULE IN('FA', 'INT','Measurement') THEN 'METRO'
+        ELSE A.MODULE END MODULE
+        FROM(
+        SELECT EQP_ID,'N1A1'FAB,EQP_G,MODULE FROM PWEB.EQP_ID_USE_STD@A1PDW WHERE ACTIVE_FLAG ='Y' AND LENGTH(EQP_ID)=5
+        UNION ALL
+        SELECT EQP_ID,'N1A3'FAB,EQP_G,MODULE FROM PWEB.EQP_ID_USE_STD@A3PDW WHERE ACTIVE_FLAG ='Y'AND LENGTH(EQP_ID)=6
+        )A LEFT JOIN (
+        SELECT KEY1 MODULE,KEY2 EQP_G FROM A1_MFG.CRITICLE_COMMENT_SUMMARY@TO_A3MFG B WHERE FUNCTION_NAME ='EQPG MODULE'
+        )B
+        ON A.EQP_G = B.EQP_G
+        )B
+        ON A.KEY3 = B.FAB AND B.EQP_ID LIKE CONCAT(CONCAT('%',A.KEY1),'%')
+        GROUP BY A.KEY1,A.KEY2
+
+    </select>
+
+    <select id="getMeasurementSRInfo" resultType="map">
+        SELECT ROUND(MAX(T3.SR)*100,1) AS OPD_SR,NVL(T.EQP_G_NEW,T.EQP_G) AS EQP_G,T.SHIFT_DATE,SUM(T.TOTAL_MOVE) AS MOVE,
+        CASE
+        WHEN SUM(TOTAL_MOVE) &gt; 0
+        THEN ROUND(SUM(MAIN_MOVE)/ SUM(TOTAL_MOVE),3)*100
+        ELSE NULL
+        END AS ACT_SR,
+        CASE
+        WHEN SUM(WIP) &gt; 0
+        THEN ROUND(SUM(PSTD_SR * WIP) / SUM(WIP),3)*100
+        ELSE NULL
+        END AS PSTD_SR
+        FROM A3MFGYW1.T_MFG_SR_KPI T
+        INNER JOIN A3MFGYW1. PRODG_INFO T2 ON T.PRODG1=T2.PRODG1  AND T.FAB = T2.FAB
+        LEFT JOIN A3MFGYW1.T_OPD_SR T3 ON T.EQP_G=T3.EQP_G
+        WHERE T.SHIFT_DATE=TO_CHAR(SYSDATE-8/24-1,'YYYYMMDD')
+        <if test="location != 'N1' and location !='' and location !=null">
+            AND T.FAB= #{location,jdbcType=VARCHAR}
+        </if>
+        AND T.PRODUCT_STATUS IN
+        <foreach collection="status" item="item" separator="," open="(" close=")">
+            #{item,jdbcType=VARCHAR}
+        </foreach>
+        <if test="tech != 'all' and tech !='' and tech !=null">
+            AND T2.TECH = #{tech,jdbcType=VARCHAR}
+        </if>
+        GROUP BY NVL(T.EQP_G_NEW,T.EQP_G),T.SHIFT_DATE
+        ORDER BY NVL(SUM(T.TOTAL_MOVE),0) DESC
+    </select>
+
+    <select id="getMeasurementSRTableByTechList" resultType="map">
+        WITH SR_DATA AS (
+        SELECT TECH,QA_ADI,QA_AEI,QA_AEI_CMP,QA_AFM,QB_BUBBLE,QB_BUBBLE_STK,QC_THK,QC_THK_SI,QC_TRIM,QG_DEFECT,QP_DEFECT,QS_SEM,QW_SEM,QX_OVERLY,QY_D_PC,QZ_DEFECT
+        FROM (
+        SELECT
+        T2.TECH,
+        NVL(T.EQP_G_NEW, T.EQP_G) AS EQP_G,
+        CASE
+        WHEN SUM(WIP) OVER (PARTITION BY T2.TECH, NVL(T.EQP_G_NEW, T.EQP_G)) &gt; 0
+        THEN ROUND(SUM(PSTD_SR * WIP) OVER (PARTITION BY T2.TECH, NVL(T.EQP_G_NEW, T.EQP_G)) /
+        SUM(WIP) OVER (PARTITION BY T2.TECH, NVL(T.EQP_G_NEW, T.EQP_G)), 3)
+        ELSE NULL
+        END AS PSTD_SR
+        FROM A3MFGYW1.T_MFG_SR_KPI T
+        INNER JOIN A3MFGYW1.PRODG_INFO T2 ON T.PRODG1 = T2.PRODG1 AND T.FAB = T2.FAB
+        WHERE T.SHIFT_DATE = TO_CHAR(SYSDATE-8/24-1, 'YYYYMMDD')
+        <if test="location != 'N1' and location !='' and location !=null">
+            AND T.FAB= #{location,jdbcType=VARCHAR}
+        </if>
+        AND T.PRODUCT_STATUS IN
+        <foreach collection="status" item="item" separator="," open="(" close=")">
+            #{item,jdbcType=VARCHAR}
+        </foreach>
+        )
+        PIVOT (
+        MAX(PSTD_SR)
+        FOR EQP_G IN (
+        'QA_ADI' AS QA_ADI,
+        'QA_AEI' AS QA_AEI,
+        'QA_AEI_CMP' AS QA_AEI_CMP,
+        'QA_AFM' AS QA_AFM,
+        'QB_Bubble' AS QB_Bubble,
+        'QB_Bubble_STK' AS QB_Bubble_STK,
+        'QC_THK' AS QC_THK,
+        'QC_THK_Si' AS QC_THK_Si,
+        'QC_Trim' AS QC_Trim,
+        'QG_Defect' AS QG_Defect,
+        'QP_Defect' AS QP_Defect,
+        'QS_SEM' AS QS_SEM,
+        'QW_SEM' AS QW_SEM,
+        'QX_Overly' AS QX_Overly,
+        'QY_D.PC' AS QY_D_PC,
+        'QZ_Defect' AS QZ_Defect
+        )
+        )
+        ORDER BY TECH
+        ),
+        SR_TEMP AS(
+        SELECT  A.*,B.WIP FROM  SR_DATA A
+        LEFT JOIN
+        (
+        SELECT T2.TECH,SUM(T.WAFER_QTY) AS WIP
+        FROM A3MFGYW1.LOT_PRIORITY_HISTORY T
+        INNER JOIN A3MFGYW1.PRODG_INFO T2 ON T.PRODG1=T2.PRODG1 AND T.FAB=T2.FAB
+        INNER JOIN
+        (
+        SELECT DISTINCT T.PRODG1,T.FAB,T.SHIFT_DATE FROM A3MFGYW1.T_MFG_SR_KPI T
+        ) T3 ON  T.PRODG1 = T3.PRODG1 AND T.FAB = T3.FAB AND T.SHIFT_DATE=T3.SHIFT_DATE
+        WHERE T.SHIFT_HOUR = '01' and t.NENG_FLAG=1
+        <if test="location != 'N1' and location !='' and location !=null">
+            AND T.FAB= #{location,jdbcType=VARCHAR}
+        </if>
+        AND T.SHIFT_DATE=TO_CHAR(SYSDATE-8/24-1,'YYYYMMDD')
+        GROUP BY  T2.TECH
+        )B ON A.TECH=B.TECH
+        ),
+        EQP_TARGET AS(
+        SELECT
+        'Target'TECH,QA_ADI,QA_AEI,QA_AEI_CMP,QA_AFM,QB_BUBBLE
+        ,QB_BUBBLE_STK,QC_THK,QC_THK_SI,QC_TRIM,QG_DEFECT,QP_DEFECT,QS_SEM,QW_SEM,QX_OVERLY,QY_D_PC,QZ_DEFECT
+        ,NULL WIP
+        FROM (
+        SELECT
+        EQP_G,SR
+        FROM A3MFGYW1.T_OPD_SR
+        ) T
+        PIVOT (
+        MAX(SR) FOR EQP_G IN (
+        'QA_ADI' AS QA_ADI,
+        'QA_AEI' AS QA_AEI,
+        'QA_AEI_CMP' AS QA_AEI_CMP,
+        'QA_AFM' AS QA_AFM,
+        'QB_Bubble' AS QB_Bubble,
+        'QB_Bubble_STK' AS QB_Bubble_STK,
+        'QC_THK' AS QC_THK,
+        'QC_THK_Si' AS QC_THK_Si,
+        'QC_Trim' AS QC_Trim,
+        'QG_Defect' AS QG_Defect,
+        'QP_Defect' AS QP_Defect,
+        'QS_SEM' AS QS_SEM,
+        'QW_SEM' AS QW_SEM,
+        'QX_Overly' AS QX_Overly,
+        'QY_D.PC' AS QY_D_PC,  -- 注意：列名不能有点号，改为下划线
+        'QZ_Defect' AS QZ_Defect
+        )
+        )
+        )
+        SELECT TECH,QA_ADI,QA_AEI,QA_AEI_CMP,QA_AFM,QB_BUBBLE,QB_BUBBLE_STK,QC_THK,QC_THK_SI,QC_TRIM,QG_DEFECT,QP_DEFECT,QS_SEM,QW_SEM,QX_OVERLY,QY_D_PC,QZ_DEFECT,WIP FROM EQP_TARGET
+        UNION ALL
+        SELECT TECH,QA_ADI,QA_AEI,QA_AEI_CMP,QA_AFM,QB_BUBBLE,QB_BUBBLE_STK,QC_THK,QC_THK_SI,QC_TRIM,QG_DEFECT,QP_DEFECT,QS_SEM,QW_SEM,QX_OVERLY,QY_D_PC,QZ_DEFECT,WIP FROM SR_TEMP
+        UNION ALL
+        SELECT
+        'TTL' AS TECH ,
+        ROUND(SUM(QA_ADI*T2.WIP)/SUM(T2.WIP),2),
+        ROUND(SUM(QA_AEI*T2.WIP)/SUM(T2.WIP),2),
+        ROUND(SUM(QA_AEI_CMP*T2.WIP)/SUM(T2.WIP),2),
+        ROUND(SUM(QA_AFM*T2.WIP)/SUM(T2.WIP),2),
+        ROUND(SUM(QB_Bubble*T2.WIP)/SUM(T2.WIP),2),
+        ROUND(SUM(QB_Bubble_STK*T2.WIP)/SUM(T2.WIP),2),
+        ROUND(SUM(QC_THK*T2.WIP)/SUM(T2.WIP),2),
+        ROUND(SUM(QC_THK_Si*T2.WIP)/SUM(T2.WIP),2),
+        ROUND(SUM(QC_Trim*T2.WIP)/SUM(T2.WIP),2),
+        ROUND(SUM(QG_Defect*T2.WIP)/SUM(T2.WIP),2),
+        ROUND(SUM(QP_Defect*T2.WIP)/SUM(T2.WIP),2),
+        ROUND(SUM(QS_SEM*T2.WIP)/SUM(T2.WIP),2),
+        ROUND(SUM(QW_SEM*T2.WIP)/SUM(T2.WIP),2),
+        ROUND(SUM(QX_Overly*T2.WIP)/SUM(T2.WIP),2),
+        ROUND(SUM(QY_D_PC*T2.WIP)/SUM(T2.WIP),2),
+        ROUND(SUM(QZ_Defect*T2.WIP)/SUM(T2.WIP),2),
+        SUM(WIP)
+        FROM SR_TEMP T2
+    </select>
+
+    <select id="getMeasurementSRTableByProdList" resultType="map">
+        WITH SR_DATA AS (
+        SELECT *
+        FROM (
+        SELECT
+        T.PRODG1,
+        NVL(T.EQP_G_NEW, T.EQP_G) AS EQP_G,
+        CASE
+        WHEN SUM(WIP) OVER (PARTITION BY T2.PRODG1, NVL(T.EQP_G_NEW, T.EQP_G)) &gt; 0
+        THEN ROUND(SUM(PSTD_SR * WIP) OVER (PARTITION BY T2.PRODG1, NVL(T.EQP_G_NEW, T.EQP_G)) /
+        SUM(WIP) OVER (PARTITION BY T2.PRODG1, NVL(T.EQP_G_NEW, T.EQP_G)), 3)
+        ELSE NULL
+        END AS PSTD_SR
+        FROM A3MFGYW1.T_MFG_SR_KPI T
+        INNER JOIN A3MFGYW1.PRODG_INFO T2 ON T.PRODG1 = T2.PRODG1 AND T.FAB = T2.FAB
+        WHERE T.SHIFT_DATE = TO_CHAR(SYSDATE-8/24-1, 'YYYYMMDD')
+        <if test="location != 'N1' and location !='' and location !=null">
+            AND T.FAB= #{location,jdbcType=VARCHAR}
+        </if>
+        <if test="tech != 'TTL' and tech !='' and tech !=null">
+            AND T2.TECH= #{tech,jdbcType=VARCHAR}
+        </if>
+        AND T.PRODUCT_STATUS IN
+        <foreach collection="status" item="item" separator="," open="(" close=")">
+            #{item,jdbcType=VARCHAR}
+        </foreach>
+        )
+        PIVOT (
+        MAX(PSTD_SR)
+        FOR EQP_G IN (
+        'QA_ADI' AS QA_ADI,
+        'QA_AEI' AS QA_AEI,
+        'QA_AEI_CMP' AS QA_AEI_CMP,
+        'QA_AFM' AS QA_AFM,
+        'QB_Bubble' AS QB_Bubble,
+        'QB_Bubble_STK' AS QB_Bubble_STK,
+        'QC_THK' AS QC_THK,
+        'QC_THK_Si' AS QC_THK_Si,
+        'QC_Trim' AS QC_Trim,
+        'QG_Defect' AS QG_Defect,
+        'QP_Defect' AS QP_Defect,
+        'QS_SEM' AS QS_SEM,
+        'QW_SEM' AS QW_SEM,
+        'QX_Overly' AS QX_Overly,
+        'QY_D.PC' AS QY_D_PC,
+        'QZ_Defect' AS QZ_Defect
+        )
+        )
+        ORDER BY PRODG1
+        ),
+        SR_TEMP AS(
+        SELECT  A.*,B.WIP FROM  SR_DATA A
+        LEFT JOIN
+        (
+        SELECT T.PRODG1,SUM(T.WAFER_QTY) AS WIP
+        FROM A3MFGYW1.LOT_PRIORITY_HISTORY T
+        WHERE T.SHIFT_HOUR = '01' and t.NENG_FLAG=1
+        <if test="location != 'N1' and location !='' and location !=null">
+            AND T.FAB= #{location,jdbcType=VARCHAR}
+        </if>
+        AND T.SHIFT_DATE=TO_CHAR(SYSDATE-8/24-1,'YYYYMMDD')
+        GROUP BY  T.PRODG1
+        )B ON A.PRODG1=B.PRODG1
+        )
+        SELECT PRODG1,QA_ADI,QA_AEI,QA_AEI_CMP,QA_AFM,QB_BUBBLE,QB_BUBBLE_STK,QC_THK,QC_THK_SI,QC_TRIM,QG_DEFECT,QP_DEFECT,QS_SEM,QW_SEM,QX_OVERLY,QY_D_PC,QZ_DEFECT
+        ,WIP
+        FROM SR_TEMP
+    </select>
+
+    <select id="getMeasurementMoveRatioInfo" resultType="map">
+        SELECT
+         SHIFT_DATE
+        <if test="fab =='N1'">
+            ,ROUND(N1_MOVE_RATIO*100,1) AS RATIO
+        </if>
+        <if test="fab =='N1A1'">
+            ,ROUND(N1A1_MOVE_RATIO*100,1) AS RATIO
+        </if>
+        <if test="fab =='N1A3'">
+            ,ROUND(N1A3_MOVE_RATIO*100,1) AS RATIO
+        </if>
+        FROM A3MFGYW1.T_MFG_MEA_MOVE_RATIO
+        ORDER BY SHIFT_DATE
+    </select>
+
+
+    <select id="getMeasurementSREQPGInfoByFab" resultType="mfg.reporting.dto.CommonSelectDTO">
+        SELECT DISTINCT EQP_G label,EQP_G value FROM  A3MFGYW1.T_MFG_MEA_SR
+        WHERE 1=1
+        <if test="fab !='N1' and fab != null and fab !=''">
+            AND LOCATION = #{fab}
+        </if>
+    </select>
+
+    <select id="getMeasurementSRTechInfoByFab" resultType="mfg.reporting.dto.CommonSelectDTO">
+        SELECT DISTINCT A.GROUP_TECH label,A.GROUP_TECH value FROM A1MFG.PRODUCT_TECH_INFO A
+        JOIN(
+        SELECT PRODG1 FROM ODS.WP_PRODUCT WHERE PRODG1 IS NOT NULL AND #{fab} IN('N1','N1A1')
+        UNION ALL
+        SELECT PRODG1 FROM PWEB.WP_PRODUCT_A3 WHERE PRODG1 IS NOT NULL AND #{fab} IN('N1','N1A3')
+        )B
+        ON A.PRODG1 = B.PRODG1
+    </select>
+
+    <select id="getMeasurementSRProdgInfoByFab" resultType="mfg.reporting.dto.CommonSelectDTO">
+        SELECT DISTINCT PRODG1 label,PRODG1 value FROM  A3MFGYW1.T_MFG_MEA_SR
+        WHERE 1=1
+        <if test="fab !='N1' and fab !=null and fab !=''">
+            AND LOCATION = #{fab}
+        </if>
+        <if test="tech!='' and tech != null and tech !='all'">
+            AND TECH = #{tech}
+        </if>
+        <if test="eqpg != null and eqpg !='' and eqpg !='all'">
+            AND EQP_G = #{eqpg}
+        </if>
+    </select>
+
+
+
+    <select id="getPilotRunFabSummaryChart" resultType="map">
+        SELECT
+        A.SHIFT_DATE,B.PHOTO_RATIO,B.ETCH_RATIO,B.CMP_RATIO
+        FROM(
+            SELECT TO_CHAR(TRUNC(SYSDATE)-ROWNUM,'YYYYMMDD')SHIFT_DATE
+            FROM DUAL
+            CONNECT BY ROWNUM&lt;=30
+        )A
+        LEFT JOIN(
+        SELECT SHIFT_DATE,FAB
+        ,ROUND(CASE WHEN COUNT(CASE WHEN MODULE='PHOTO' THEN PARENT_LOT ELSE NULL END)=0 THEN NULL ELSE
+        (COUNT(CASE WHEN MODULE='PHOTO' AND SON_START_ACT_TIME&lt;= SON_START_STD_TIME THEN PARENT_LOT ELSE NULL END)
+        +COUNT(CASE WHEN MODULE='PHOTO' AND PARENT_START_ACT_TIME&lt;=PARENT_START_STD_TIME THEN PARENT_LOT ELSE NULL END)
+        +COUNT(CASE WHEN MODULE='PHOTO' AND SON_MERGE_ACT_TIME&lt;=SON_MERGE_STD_TIME THEN PARENT_LOT ELSE NULL END)
+        +COUNT(CASE WHEN MODULE='PHOTO' AND PARENT_MERGE_ACT_TIME&lt;=PARENT_MERGE_STD_TIME THEN PARENT_LOT ELSE NULL END))
+        /(COUNT(CASE WHEN MODULE='PHOTO' THEN PARENT_LOT ELSE NULL END)*4)*100 END,1) PHOTO_RATIO
+        ,ROUND(CASE WHEN COUNT(CASE WHEN MODULE='ETCH' THEN PARENT_LOT ELSE NULL END)=0 THEN NULL ELSE
+        (COUNT(CASE WHEN MODULE='ETCH' AND SON_START_ACT_TIME&lt;= SON_START_STD_TIME THEN PARENT_LOT ELSE NULL END)
+        +COUNT(CASE WHEN MODULE='ETCH' AND PARENT_START_ACT_TIME&lt;=PARENT_START_STD_TIME THEN PARENT_LOT ELSE NULL END)
+        +COUNT(CASE WHEN MODULE='ETCH' AND SON_MERGE_ACT_TIME&lt;=SON_MERGE_STD_TIME THEN PARENT_LOT ELSE NULL END)
+        +COUNT(CASE WHEN MODULE='ETCH' AND PARENT_MERGE_ACT_TIME&lt;=PARENT_MERGE_STD_TIME THEN PARENT_LOT ELSE NULL END))
+        /(COUNT(CASE WHEN MODULE='ETCH' THEN PARENT_LOT ELSE NULL END)*4)*100 END,1) ETCH_RATIO
+        ,ROUND(CASE WHEN COUNT(CASE WHEN MODULE='CMP' THEN PARENT_LOT ELSE NULL END)=0 THEN NULL ELSE
+        (COUNT(CASE WHEN MODULE='CMP' AND SON_START_ACT_TIME&lt;= SON_START_STD_TIME THEN PARENT_LOT ELSE NULL END)
+        +COUNT(CASE WHEN MODULE='CMP' AND PARENT_START_ACT_TIME&lt;=PARENT_START_STD_TIME THEN PARENT_LOT ELSE NULL END)
+        +COUNT(CASE WHEN MODULE='CMP' AND SON_MERGE_ACT_TIME&lt;=SON_MERGE_STD_TIME THEN PARENT_LOT ELSE NULL END)
+        +COUNT(CASE WHEN MODULE='CMP' AND PARENT_MERGE_ACT_TIME&lt;=PARENT_MERGE_STD_TIME THEN PARENT_LOT ELSE NULL END))
+        /(COUNT(CASE WHEN MODULE='CMP' THEN PARENT_LOT ELSE NULL END)*4)*100 END,1) CMP_RATIO
+        FROM A1_MFG.PILOT_RUN_DETAIL WHERE (PIRUN_TYPE&lt;&gt;'PM' OR PIRUN_TYPE IS NULL)
+        AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD')
+        AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD') AND FAB=#{fab}
+        GROUP BY SHIFT_DATE,FAB ORDER BY SHIFT_DATE
+        )B
+        ON A.SHIFT_DATE = B.SHIFT_DATE
+        ORDER BY A.SHIFT_DATE
+    </select>
+
+
+    <select id="getPilotRunSummaryChart" resultType="map">
+        SELECT A.SHIFT_DATE
+        ,B.TARGET_COUNT
+        ,B.TTL_COUNT
+        ,B.RATIO
+        FROM(
+        SELECT TO_CHAR(TRUNC(SYSDATE)-ROWNUM,'YYYYMMDD')SHIFT_DATE
+        FROM DUAL
+        CONNECT BY ROWNUM&lt;=30
+        )A
+        LEFT JOIN(
+        SELECT SHIFT_DATE,TTL_COUNT,TARGET_COUNT
+        ,CASE WHEN TTL_COUNT > 0 THEN
+        ROUND(TARGET_COUNT*100/TTL_COUNT,1)  END RATIO FROM(
+        SELECT SHIFT_DATE,COUNT(1)TTL_COUNT,SUM(TARGET_FLAG)TARGET_COUNT FROM(
+        SELECT
+        SHIFT_DATE,SON_LOT AS LOT_ID,PARENT_LOT PARENT_LOT_ID,MODULE,FAB
+        ,CASE WHEN
+        <if test="type == 1">
+            --子批上机 onTarget
+            SON_START_ACT_TIME&lt;= SON_START_STD_TIME
+        </if>
+        <if test="type == 2">
+            -- 子批 Merge onTarget
+            SON_MERGE_ACT_TIME&lt;=SON_MERGE_STD_TIME
+        </if>
+        <if test="type == 3 or type == 5">
+            -- 母批上机 onTarget
+            PARENT_START_ACT_TIME&lt;=PARENT_START_STD_TIME
+        </if>
+        <if test="type == 4 or type == 6">
+            -- 母批 Merge onTarget
+            PARENT_MERGE_ACT_TIME&lt;=PARENT_MERGE_STD_TIME
+        </if>
+        THEN 1 ELSE 0 END TARGET_FLAG
+        FROM A1_MFG.PILOT_RUN_DETAIL
+        WHERE NVL(PIRUN_TYPE,'N') &lt;&gt;'PM' AND
+        FAB = #{fab} AND MODULE = #{module}
+        <if test="type == 3">
+            AND PARENT_START_TYPE = 'NOPATH'
+        </if>
+        <if test="type == 4">
+            AND PARENT_MERGE_TYPE = 'NOPATH'
+        </if>
+        <if test="type == 5">
+            AND PARENT_START_TYPE = '有PATH'
+        </if>
+        <if test="type == 6">
+            AND PARENT_MERGE_TYPE = '有PATH'
+        </if>
+        )GROUP BY SHIFT_DATE
+        )
+        )B
+        ON A.SHIFT_DATE = B.SHIFT_DATE
+        ORDER BY A.SHIFT_DATE
+    </select>
+
+    <select id="getpilotRunSummaryTableList" resultType="map">
+        SELECT
+        SHIFT_DATE,MODULE,FAB,EQP_G ,COUNT(1)TTL_COUNT
+        ,SUM(SON_START_TARGET_FLAG)SON_START_TARGET_COUNT
+        ,SUM(PARENT_START_TARGET_FLAG)PARENT_START_TARGET_COUNT
+        ,SUM(SON_MERGE_TARGET_FLAG)SON_MERGE_TARGET_COUNT
+        ,SUM(PARENT_MERGE_TARGET_FLAG)PARENT_MERGE_TARGET_COUNT
+        FROM(
+        SELECT
+        SHIFT_DATE,MODULE,FAB,EQP_G
+        ,CASE WHEN SON_START_ACT_TIME&lt;= SON_START_STD_TIME THEN 1 ELSE 0 END SON_START_TARGET_FLAG
+        ,CASE WHEN PARENT_START_ACT_TIME&lt;=PARENT_START_STD_TIME THEN 1 ELSE 0 END PARENT_START_TARGET_FLAG
+        ,CASE WHEN SON_MERGE_ACT_TIME&lt;=SON_MERGE_STD_TIME THEN 1 ELSE 0 END SON_MERGE_TARGET_FLAG
+        ,CASE WHEN PARENT_MERGE_ACT_TIME&lt;=PARENT_MERGE_STD_TIME THEN 1 ELSE 0 END PARENT_MERGE_TARGET_FLAG
+        FROM A1_MFG.PILOT_RUN_DETAIL
+        WHERE NVL(PIRUN_TYPE,'N') &lt;&gt;'PM' AND
+        SHIFT_DATE = #{shiftDate} AND FAB = #{fab} AND MODULE =#{module}
+        <if test="type == 3">
+            AND PARENT_START_TYPE = 'NOPATH'
+        </if>
+        <if test="type == 4">
+            AND PARENT_MERGE_TYPE = 'NOPATH'
+        </if>
+        <if test="type == 5">
+            AND PARENT_START_TYPE = '有PATH'
+        </if>
+        <if test="type == 6">
+            AND PARENT_MERGE_TYPE = '有PATH'
+        </if>
+        )GROUP BY SHIFT_DATE,MODULE,FAB,EQP_G
+    </select>
+
+    <select id="getpilotRunDetailsTableList" resultType="map">
+        SELECT
+        SHIFT_DATE,MODULE,FAB,SON_LOT LOT_ID,PARENT_LOT PARENT_LOT_ID
+        ,SPLIT_OPE_NO ,SON_ORES_RLS_TIME,MERGE_OPE_NO ,PRODG1,EQP_G,PARENT_MERGE_TYPE
+        ,SON_START_TIME ,SON_START_ACT_TIME ,SON_START_STD_TIME
+        ,PARENT_START_TIME ,PARENT_START_ACT_TIME ,PARENT_START_STD_TIME
+        ,SON_LAST_COMP_TIME ,SON_MERGE_ACT_TIME ,SON_MERGE_STD_TIME
+        ,PARENT_LAST_COMP_TIME ,PARENT_MERGE_ACT_TIME ,PARENT_MERGE_STD_TIME
+        ,PIRUN_TYPE,PIRUN_DIFF,NVL(INLINE_COMP_TIME,SON_LAST_COMP_TIME)INLINE_COMP_TIME
+        FROM A1_MFG.PILOT_RUN_DETAIL
+        WHERE NVL(PIRUN_TYPE,'N') &lt;&gt;'PM' AND
+        SHIFT_DATE = #{shiftDate} AND FAB = #{fab} AND MODULE =#{module}
+        <if test="eqpg !='' and eqpg != null and eqpg != 'TOTAL'">
+            AND EQP_G = #{eqpg}
+        </if>
+        <if test="eqpg == null or eqpg == '' ">
+            AND EQP_G IS NULL
+        </if>
+        <if test="type == 3">
+            AND PARENT_START_TYPE = 'NOPATH'
+        </if>
+        <if test="type == 4">
+            AND PARENT_MERGE_TYPE = 'NOPATH'
+        </if>
+        <if test="type == 5">
+            AND PARENT_START_TYPE = '有PATH'
+        </if>
+        <if test="type == 6">
+            AND PARENT_MERGE_TYPE = '有PATH'
+        </if>
+    </select>
+
+
+    <select id="updateLpHealthDetails">
+        MERGE INTO A1_MFG.COMMENT_SUMMARY A
+        USING (
+        SELECT 'lpHealthDetailComment'FUNCTION_NAME,#{eqpId} EQP_ID,#{portId} PORT_ID,#{claimTime} CLAIM_TIME ,#{fcomment} F_COMMENT ,#{updateUser} UPDATE_USER,SYSDATE UPDATE_TIME FROM DUAL
+        ) B
+        ON (A.FUNCTION_NAME = B.FUNCTION_NAME AND A.KEY1 = B.EQP_ID AND A.KEY2 = B.PORT_ID AND A.KEY3 = B.CLAIM_TIME)
+        WHEN MATCHED THEN
+        UPDATE SET F_COMMENT = B.F_COMMENT,A.UPDATE_USER = B.UPDATE_USER,A.UPDATE_TIME = B.UPDATE_TIME
+        WHEN NOT MATCHED THEN
+        INSERT(FUNCTION_NAME,KEY1,KEY2,KEY3,F_COMMENT,UPDATE_USER,UPDATE_TIME) VALUES(B.FUNCTION_NAME,B.EQP_ID,B.PORT_ID,B.CLAIM_TIME,B.F_COMMENT,B.UPDATE_USER,B.UPDATE_TIME)
+    </select>
+
+    <select id="getReworkSummaryChart" resultType="map">
+        SELECT A.SHIFT_DATE,NVL(B.MOVE_PARENT,A.MOVE_PARENT) MOVE_PARENT, NVL(B.MOVE_SON,A.MOVE_SON) MOVE_SON, NVL(B.EQPG_TOTAL_COUNT,A.EQPG_TOTAL_COUNT) EQPG_TOTAL_COUNT,
+        NVL(B.EQPG_TOTAL_MOVE,A.EQPG_TOTAL_MOVE) EQPG_TOTAL_MOVE, NVL(B.REWORK_COUNT,A.REWORK_COUNT) REWORK_COUNT, NVL(B.REWORK_COUNT_RATIO,A.REWORK_COUNT_RATIO) REWORK_COUNT_RATIO,
+        NVL(B.MOVE_PARENT_RATIO,A.MOVE_PARENT_RATIO) MOVE_PARENT_RATIO, NVL(B.MOVE_SON_RATIO,A.MOVE_SON_RATIO) MOVE_SON_RATIO,NVL(B.TARGET,A.TARGET) TARGET
+        FROM (
+        SELECT TO_CHAR(SYSDATE-LEVEL, 'YYYYMMDD') AS SHIFT_DATE,0 AS MOVE_PARENT,0 MOVE_SON,0 EQPG_TOTAL_COUNT,0 EQPG_TOTAL_MOVE,0 REWORK_COUNT,0 REWORK_COUNT_RATIO,0 MOVE_PARENT_RATIO,0 MOVE_SON_RATIO,0 TARGET
+        FROM DUAL
+        CONNECT BY LEVEL &lt;= 30
+        ) A
+        LEFT JOIN (
+        SELECT A.SHIFT_DATE,A.MOVE_PARENT,A.MOVE_SON,A.EQPG_TOTAL_COUNT, A.EQPG_TOTAL_MOVE, A.REWORK_COUNT,A.REWORK_COUNT_RATIO,A.MOVE_PARENT_RATIO, A.MOVE_SON_RATIO,A.TARGET*100 TARGET
+        FROM (
+        SELECT A.SHIFT_DATE,SUM(MOVE_PARENT) MOVE_PARENT,SUM(MOVE_SON) MOVE_SON,SUM(EQPG_TOTAL_COUNT) EQPG_TOTAL_COUNT
+        ,SUM(EQPG_TOTAL_MOVE) EQPG_TOTAL_MOVE,SUM(REWORK_COUNT) REWORK_COUNT,
+        CASE WHEN SUM(EQPG_TOTAL_COUNT)=0 THEN 0 ELSE ROUND(SUM(REWORK_COUNT)/SUM(EQPG_TOTAL_COUNT),4)*100 END REWORK_COUNT_RATIO,
+        CASE WHEN SUM(EQPG_TOTAL_MOVE)=0 THEN 0 ELSE ROUND(SUM(MOVE_PARENT)/SUM(EQPG_TOTAL_MOVE),4)*100 END MOVE_PARENT_RATIO,
+        CASE WHEN SUM(EQPG_TOTAL_MOVE)=0 THEN 0 ELSE ROUND(SUM(MOVE_SON)/SUM(EQPG_TOTAL_MOVE),4)*100 END MOVE_SON_RATIO,
+        CASE WHEN SUM(A.EQPG_TOTAL_MOVE)=0 THEN SUM(A.TARGET) ELSE ROUND(SUM(A.EQPG_TOTAL_MOVE*A.TARGET)/SUM(A.EQPG_TOTAL_MOVE),3) END TARGET
+        FROM (
+        SELECT A.SHIFT_DATE,A.EQP_G,SUM(REWORK_COUNT) REWORK_COUNT,SUM(A.MOVE_SON) MOVE_SON,SUM(A.MOVE_PARENT) MOVE_PARENT,SUM(A.EQPG_TOTAL_COUNT) EQPG_TOTAL_COUNT,
+        SUM(A.EQPG_TOTAL_MOVE) EQPG_TOTAL_MOVE, MAX(TARGET) TARGET
+        FROM (
+        SELECT A.SHIFT_DATE,A.EQP_G,A.LOCATION,A.MODULE,A.REWORK_COUNT,A.MOVE_SON,A.MOVE_PARENT,A.EQPG_TOTAL_COUNT,A.EQPG_TOTAL_MOVE
+        FROM A3MFGYW1.EQPG_REWORK_SUMMARY A
+        WHERE 1=1
+        <if test="fab != null and fab !='' and fab !='N1'">
+            AND A.LOCATION = #{fab}
+        </if>
+        <if test="module != null and module !='' and module !='all'">
+            AND A.MODULE = DECODE(#{module},'METRO','Measurement',#{module})
+        </if>
+        <if test="eqpg != null and eqpg !='' and eqpg !='all'">
+            AND A.EQP_G = #{eqpg}
+        </if>
+        ) A
+        LEFT JOIN (
+        SELECT  SHIFT_DATE,KEY1 MODULE,KEY2 TARGET,KEY3 EQP_G FROM A1_MFG.CRITICLE_COMMENT_SUMMARY_HS  B WHERE FUNCTION_NAME = 'Rework Target'
+        ) B ON A.EQP_G= B.EQP_G AND A.SHIFT_DATE = B.SHIFT_DATE
+        GROUP BY A.SHIFT_DATE,A.EQP_G
+        ) A
+        GROUP BY A.SHIFT_DATE
+        )A
+        ) B ON A.SHIFT_DATE = B.SHIFT_DATE
+        ORDER BY A.SHIFT_DATE
+    </select>
+
+
+    <select id="getReworkMoveDetails" resultType="map">
+        SELECT A.SHIFT_DATE,A.FAB,A.LOCATION,A.MODULE,A.TECH,A.PRODG1,A.PRODSPEC_ID,A.LOT_ID,A.OPE_NO,A.WAFER_QTY,A.PARENT_LOT_ID,A.PARENT_WAFER_QTY,A.EQP_ID,A.EQP_G
+        FROM A3MFGYW1.EQPG_REWORK_MOVE_SUMMARY A
+        WHERE SHIFT_DATE = #{shiftDate}
+        <if test="fab != null and fab !='' and fab !='N1'">
+            AND LOCATION = #{fab}
+        </if>
+        <if test="module != null and module !='' and module !='all'">
+            AND MODULE = DECODE(#{module},'METRO','Measurement',#{module})
+        </if>
+        <if test="eqpg != null and eqpg !='' and eqpg !='all'">
+            AND EQP_G = #{eqpg}
+        </if>
+        ORDER BY MODULE, EQP_G,EQP_ID
+    </select>
+
+
+    <select id="getReprocessMonitorSummaryChart" resultType="map">
+        SELECT A.SHIFT_DATE,NVL(B.RATIO,A.RATIO) HOLD_RATIO,NVL(B.DUR,A.DUR) HOLD_TIME
+        ,C.HOLD_TIME_TARGET ,D.HOLD_RATIO_TARGET
+        FROM (
+        SELECT TO_CHAR(SYSDATE-LEVEL, 'YYYYMMDD') AS SHIFT_DATE,0 AS RATIO,0 AS DUR
+        FROM DUAL
+        CONNECT BY LEVEL &lt;= 30
+        ) A
+        LEFT JOIN (
+        SELECT SHIFT_DATE,ROUND(AVG(RATIO),4)*100 RATIO,ROUND(AVG(DUR),2) DUR
+        FROM A3MFGYW1.EQPG_REDEPO_SUMMARY
+        WHERE 1=1
+        <if test="fab != null and fab !='' and fab !='N1'">
+            AND LOCATION = #{fab}
+        </if>
+        <if test="module != null and module !='' and module !='all'">
+            AND MODULE = DECODE(#{module},'METRO','Measurement',#{module})
+        </if>
+        <if test="eqpg != null and eqpg !='' and eqpg !='all'">
+            AND EQP_G = #{eqpg}
+        </if>
+        GROUP BY SHIFT_DATE
+        ) B ON A.SHIFT_DATE = B.SHIFT_DATE
+        LEFT JOIN (
+        SELECT SHIFT_DATE,KEY2 HOLD_TIME_TARGET FROM A1_MFG.CRITICLE_COMMENT_SUMMARY_HS WHERE FUNCTION_NAME ='ReProcess Monitor Dur Target'
+        )C
+        ON A.SHIFT_DATE = C.SHIFT_DATE
+        LEFT JOIN(
+        SELECT SHIFT_DATE,KEY2*100 HOLD_RATIO_TARGET  FROM A1_MFG.CRITICLE_COMMENT_SUMMARY_HS WHERE FUNCTION_NAME ='ReProcess Monitor ratio Target'
+        )D
+        ON A.SHIFT_DATE = D.SHIFT_DATE
+        ORDER BY A.SHIFT_DATE
+    </select>
+
+
+    <select id="getReprocessMonitorDetails" resultType="map">
+        SELECT LOT_ID,SHIFT_DATE,HOLD_CODE,HOLD_COMMENT,WAFER_QTY,OPE_NO,PRODSPEC_ID,EQP_ID,EQP_G,MODULE,DUR
+        FROM A3MFGYW1.EQPG_REDEPO_SUMMARY
+        WHERE SHIFT_DATE=#{shiftDate}
+        <if test="fab!= null and fab !='' and fab != 'N1'">
+            AND LOCATION = #{fab}
+        </if>
+        <if test="module != null and module !='' and module !='all'">
+            AND MODULE = DECODE(#{module},'METRO','Measurement',#{module})
+        </if>
+        <if test="eqpg != null and eqpg !='' and eqpg !='all'">
+            AND EQP_G = #{eqpg}
+        </if>
+    </select>
+
+    <select id="getReworkTargetList" resultType="map">
+        SELECT KEY1 MODULE,KEY2 TARGET,KEY3 EQP_G FROM A1_MFG.CRITICLE_COMMENT_SUMMARY
+        WHERE FUNCTION_NAME ='Rework Target'
+        <if test="module != '' and module !=null and module != 'all'">
+            AND KEY1 = #{module}
+        </if>
+    </select>
+
+    <select id="updateReworkTargetInfo">
+        UPDATE A1_MFG.CRITICLE_COMMENT_SUMMARY
+        SET KEY2 = #{target},UPDATE_USER = #{updateUser},UPDATE_TIME = SYSDATE
+        WHERE FUNCTION_NAME ='Rework Target' AND KEY1 = #{module} AND KEY3 = #{eqpg}
+    </select>
+
+    <select id="validReworkTargetInfo" resultType="map">
+        SELECT KEY1 MODULE,KEY2 TARGET FROM A1_MFG.CRITICLE_COMMENT_SUMMARY
+        WHERE FUNCTION_NAME ='Rework Target' AND KEY1 = #{module} AND KEY3=#{eqpg}
+    </select>
+
+    <select id="insertReworkTargetInfo">
+        INSERT INTO A1_MFG.CRITICLE_COMMENT_SUMMARY(FUNCTION_NAME,KEY1,KEY2,KEY3,F_COMMENT,UPDATE_USER,UPDATE_TIME)
+        VALUES('Rework Target',#{module},#{target},#{eqpg},'Rework Target',#{updateUser},SYSDATE)
+    </select>
+
+    <select id="getMeasurementNGDetails" resultType="map">
+        SELECT C1.OPER_NO,C1.OPER_SEQ,C1.STD_SR,C1.ACT_SR,C2.TOTAL_COUNT,C2.NG_RATIO
+        FROM (
+        SELECT OPER_NO,AVG(OPER_SEQ) OPER_SEQ,
+        CASE WHEN SUM(TOTAL_COUNT)&gt;0 THEN ROUND(100*NVL(SUM(SR*TOTAL_COUNT)/SUM(TOTAL_COUNT),AVG(SR)),1) END STD_SR,
+        CASE WHEN SUM(TOTAL_COUNT)&gt;0 THEN ROUND(100*NVL(SUM(ACT_SR*TOTAL_COUNT)/SUM(TOTAL_COUNT),AVG(ACT_SR)),1) END ACT_SR
+        FROM (
+        SELECT B1.FAB,B1.PRODG1,B1.OPER_NO,B1.OPER_SEQ,B1.SR,B2.TOTAL_COUNT,B2.ACT_SR
+        FROM (
+        SELECT A1.FAB,A1.PRODG1,A1.OPER_NO,A1.OPER_SEQ,A1.SR,A1.EQP_G,A2.TECH
+        FROM A3MFGYW1.FLOW_STD_CYCLE_TIME A1,
+        A3MFGYW1.PRODG_INFO A2
+        WHERE A1.FAB=A2.FAB AND A1.PRODG1=A2.PRODG1
+        AND A1.EQP_G=#{eqpg}
+        <if test="tech !='' and tech !=null and tech !='all'">
+            AND A2.TECH=#{tech}
+        </if>
+        <if test="prodg !='' and prodg !=null and prodg !='all'">
+            AND A2.PRODG1=#{prodg}
+        </if>
+        )B1,
+        (
+        SELECT LOCATION,PRODG1,OPE_NO,COUNT(EQP_ID) TOTAL_COUNT,COUNT(EQP_ID)/COUNT(1) ACT_SR
+        FROM A3MFGYW1.MOVE_SUMMARY
+        WHERE 1=1
+        <if test="date == 'pre30D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date == 'pre7D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-7,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date == 'pre3D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-3,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        AND EQP_G=#{eqpg}
+        <if test="tech !='' and tech !=null and tech !='all'">
+            AND TECH=#{tech}
+        </if>
+        <if test="prodg !='' and prodg !=null and prodg !='all'">
+            AND PRODG1=#{prodg}
+        </if>
+        GROUP BY LOCATION,PRODG1,OPE_NO
+        )B2
+        WHERE B1.FAB=B2.LOCATION AND B1.PRODG1=B2.PRODG1(+) AND B1.OPER_NO=B2.OPE_NO(+)
+        <if test="fab !='' and fab !=null and fab !='N1'">
+            AND B1.FAB=#{fab}
+        </if>
+        )
+        GROUP BY OPER_NO
+        )C1,
+        (
+        SELECT B1.OPE_NO,B1.TOTAL_COUNT,NVL(B2.NG_COUNT,0) NG_COUNT,CASE WHEN B1.TOTAL_COUNT&gt;0 THEN LEAST(ROUND(100*NVL(B2.NG_COUNT,0)/B1.TOTAL_COUNT,1),100) END NG_RATIO
+        FROM (
+        SELECT OPE_NO,COUNT(1) TOTAL_COUNT
+        FROM A3MFGYW1.MOVE_SUMMARY
+        WHERE EQP_ID IS NOT NULL
+        <if test="date == 'pre30D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date == 'pre7D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-7,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        <if test="date == 'pre3D'">
+            AND SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24-3,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24-1,'YYYYMMDD')
+        </if>
+        AND EQP_G=#{eqpg}
+        <if test="tech !='' and tech !=null and tech !='all'">
+            AND TECH=#{tech}
+        </if>
+        <if test="prodg !='' and prodg !=null and prodg !='all'">
+            AND PRODG1=#{prodg}
+        </if>
+        <if test="fab !='' and fab !=null and fab !='N1'">
+            AND LOCATION=#{fab}
+        </if>
+        GROUP BY OPE_NO
+        )B1,
+        (
+        SELECT OPE_NO,COUNT(1) NG_COUNT
+        FROM (
+        SELECT DISTINCT TO_CHAR(A1.CLAIM_TIME-7.5/24,'YYYYMMDD') SHIFT_DATE,A1.LOCATION,A1.LOT_ID,A1.RESPONSIBLE_OPE_NO OPE_NO,A1.PRODG1,
+        A1.CLAIM_TIME,A1.RELEASE_TIME,A2.EQP_G,A3.TECH
+        FROM A3MFGYW1.HOLD_SUMMARY A1,
+        A3MFGYW1.FLOW_STD_CYCLE_TIME A2,
+        A3MFGYW1.PRODG_INFO A3
+        WHERE A1.FAB=A2.FAB(+) AND A1.PRODG1=A2.PRODG1(+) AND A1.RESPONSIBLE_OPE_NO=A2.OPER_NO(+)
+        AND A1.FAB=A3.FAB(+) AND A1.PRODG1=A3.PRODG1(+)
+        AND A1.HOLD_TYPE IN ('SpecOverHold','SPCOutOfRangeHold')
+        <if test="date == 'pre30D'">
+            AND A1.CLAIM_TIME BETWEEN TRUNC(SYSDATE-7.5/24-30)+7.5/24 AND TRUNC(SYSDATE-7.5/24)+7.5/24
+        </if>
+        <if test="date == 'pre7D'">
+            AND A1.CLAIM_TIME BETWEEN TRUNC(SYSDATE-7.5/24-7)+7.5/24 AND TRUNC(SYSDATE-7.5/24)+7.5/24
+        </if>
+        <if test="date == 'pre3D'">
+            AND A1.CLAIM_TIME BETWEEN TRUNC(SYSDATE-7.5/24-3)+7.5/24 AND TRUNC(SYSDATE-7.5/24)+7.5/24
+        </if>
+        AND A2.EQP_G=#{eqpg}
+        <if test="tech !='' and tech !=null and tech !='all'">
+        AND A3.TECH=#{tech}
+     </if>
+        <if test="prodg !='' and prodg !=null and prodg !='all'">
+            AND A1.PRODG1=#{prodg}
+        </if>
+        <if test="fab !='' and fab !=null and fab !='N1'">
+            AND A1.LOCATION=#{fab}
+        </if>
+        )
+        GROUP BY OPE_NO
+        )B2
+        WHERE B1.OPE_NO=B2.OPE_NO(+)
+        )C2
+        WHERE C1.OPER_NO=C2.OPE_NO
+        ORDER BY C1.OPER_SEQ
+    </select>
+
+
+
+    <select id="getMeasurementWATRatioSummary" resultType="map">
+        SELECT CASE WHEN A.FLAG = 1 THEN A.SHIFT_DATE || '_AVG'
+        WHEN A.FLAG =2 THEN A.SHIFT_DATE END SHIFT_DATE
+        ,NVL(C.TOTAL_TIME,B.TOTAL_TIME) TOTAL_TIME,NVL(C.ADD_TEST_RUNTIME,B.ADD_TEST_RUNTIME) ADD_TEST_RUNTIME,NVL(C.RE_TEST_RUNTIME,B.RE_TEST_RUNTIME) RE_TEST_RUNTIME,
+        NVL(C.INLINE_TIME,B.INLINE_TIME) INLINE_TIME,NVL(C.ADD_TEST_RATIO,B.ADD_TEST_RATIO) ADD_TEST_RATIO,NVL(C.RE_TEST_RATIO,B.RE_TEST_RATIO) RE_TEST_RATIO,A.ADD_TEST_RATIO_TARGET,A.RE_TEST_RATIO_TARGET
+        FROM (
+        SELECT TO_CHAR(ADD_MONTHS(SYSDATE, LEVEL - 2), 'YYYYMM') AS SHIFT_DATE,0 AS RATIO,3 RE_TEST_RATIO_TARGET,5 ADD_TEST_RATIO_TARGET,1 FLAG
+        FROM DUAL
+        CONNECT BY LEVEL &lt;= 2
+        UNION ALL
+        SELECT TO_CHAR(SYSDATE-LEVEL, 'YYYYMMDD') AS SHIFT_DATE,0 AS RATIO,3 RE_TEST_RATIO_TARGET,5 ADD_TEST_RATIO_TARGET,2 FLAG
+        FROM DUAL
+        CONNECT BY LEVEL &lt;= 30
+        ) A
+        LEFT JOIN (
+        SELECT SHIFT_MONTH SHIFT_DATE,ROUND(AVG(TOTAL_TIME),2) TOTAL_TIME,0 ADD_TEST_RUNTIME,0 RE_TEST_RUNTIME,ROUND(AVG(TOTAL_TIME),2) INLINE_TIME, 0 ADD_TEST_RATIO,0 RE_TEST_RATIO
+        FROM (
+        SELECT SUBSTR(SHIFT_DATE,1,6) SHIFT_MONTH,SHIFT_DATE,ROUND(SUM(TOTAL_TIME),2) TOTAL_TIME,0 ADD_TEST_RUNTIME,0 RE_TEST_RUNTIME,ROUND(SUM(TOTAL_TIME),2) INLINE_TIME, 0 ADD_TEST_RATIO,0 RE_TEST_RATIO
+        FROM (
+        SELECT 'N1A3' LOCATION, A.SHIFT_DATE,A.EQP_G,(A.PRD_TIME_DTH+A.SBY_TIME_DTH+A.ENG_TIME_DTH)*24 TOTAL_TIME
+        FROM (
+        SELECT A.*,ROW_NUMBER()OVER(PARTITION BY SHIFT_DATE,EQP_G ORDER BY UPDATE_TIME) RN
+        FROM PWEB.V_EQPG_MOVE_STATUS_DAILY_OCS@A3PDW A
+        ) A
+        WHERE A.RN=1
+        UNION ALL
+        SELECT 'N1A1' LOCATION, B.SHIFT_DATE,B.EQP_G,(B.PRD_TIME_DTH+B.SBY_TIME_DTH+B.ENG_TIME_DTH)*24 TOTAL_TIME
+        FROM (
+        SELECT A.*,ROW_NUMBER()OVER(PARTITION BY SHIFT_DATE,EQP_G ORDER BY UPDATE_TIME) RN
+        FROM PWEB.V_EQPG_MOVE_STATUS_DAILY_OCS@A1PDW A
+        ) B
+        WHERE B.RN=1
+        ) A
+        --放查询条件
+        WHERE A.EQP_G='WAT_Tester'
+        <if test="fab !='' and fab != null and fab !='N1'">
+            AND A.LOCATION=#{fab}
+        </if>
+        GROUP BY A.SHIFT_DATE
+        )
+        GROUP BY SHIFT_MONTH
+        UNION ALL
+        SELECT SHIFT_DATE,ROUND(SUM(TOTAL_TIME),2) TOTAL_TIME,0 ADD_TEST_RUNTIME,0 RE_TEST_RUNTIME,ROUND(SUM(TOTAL_TIME),2) INLINE_TIME, 0 ADD_TEST_RATIO,0 RE_TEST_RATIO
+        FROM (
+        SELECT 'N1A3' LOCATION, A.SHIFT_DATE,A.EQP_G,(A.PRD_TIME_DTH+A.SBY_TIME_DTH+A.ENG_TIME_DTH)*24 TOTAL_TIME
+        FROM (
+        SELECT A.*,ROW_NUMBER()OVER(PARTITION BY SHIFT_DATE,EQP_G ORDER BY UPDATE_TIME) RN
+        FROM PWEB.V_EQPG_MOVE_STATUS_DAILY_OCS@A3PDW A
+        ) A
+        WHERE A.RN=1
+        UNION ALL
+        SELECT 'N1A1' LOCATION, B.SHIFT_DATE,B.EQP_G,(B.PRD_TIME_DTH+B.SBY_TIME_DTH+B.ENG_TIME_DTH)*24 TOTAL_TIME
+        FROM (
+        SELECT A.*,ROW_NUMBER()OVER(PARTITION BY SHIFT_DATE,EQP_G ORDER BY UPDATE_TIME) RN
+        FROM PWEB.V_EQPG_MOVE_STATUS_DAILY_OCS@A1PDW A
+        ) B
+        WHERE B.RN=1
+        ) A
+        --放查询条件
+        WHERE 1=1 AND
+        A.EQP_G='WAT_Tester'
+        <if test="fab !='' and fab != null and fab !='N1'">
+            AND A.LOCATION=#{fab}
+        </if>
+        GROUP BY SHIFT_DATE
+        ) B ON A.SHIFT_DATE=B.SHIFT_DATE
+        LEFT JOIN (
+        SELECT SHIFT_MONTH SHIFT_DATE,ROUND(AVG(TOTAL_TIME),2) TOTAL_TIME,ROUND(AVG(ADD_TEST_RUNTIME),2) ADD_TEST_RUNTIME,ROUND(AVG(RE_TEST_RUNTIME),2) RE_TEST_RUNTIME,ROUND(AVG(INLINE_TIME),2) INLINE_TIME,
+        ROUND(SUM(ADD_TEST_RUNTIME)/SUM(TOTAL_TIME),4)*100 ADD_TEST_RATIO,
+        ROUND(SUM(RE_TEST_RUNTIME)/SUM(TOTAL_TIME),4)*100 RE_TEST_RATIO
+        FROM (
+        SELECT SUBSTR(SHIFT_DATE,1,6) SHIFT_MONTH,SHIFT_DATE,SUM(TOTAL_TIME) TOTAL_TIME,SUM(ADD_TEST_RUNTIME) ADD_TEST_RUNTIME,SUM(RE_TEST_RUNTIME) RE_TEST_RUNTIME , SUM(TOTAL_TIME)-SUM(ADD_TEST_RUNTIME)-SUM(RE_TEST_RUNTIME) INLINE_TIME
+        FROM (
+        SELECT SHIFT_DATE,EQP_G,LOCATION, MAX(TOTAL_TIME) TOTAL_TIME,
+        SUM(CASE WHEN TEST_TYPE='A' THEN DURATION ELSE 0 END) ADD_TEST_RUNTIME,
+        SUM(CASE WHEN TEST_TYPE='R' THEN DURATION ELSE 0 END) RE_TEST_RUNTIME
+        FROM A3MFGYW1.EQPG_WAT_TEST_SUMMARY
+        --放查询条件
+        WHERE  SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24 -90,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD')
+        <if test="fab !='' and fab != null and fab !='N1'">
+            AND LOCATION=#{fab}
+        </if>
+        GROUP BY SHIFT_DATE,EQP_G,LOCATION
+        )
+        GROUP BY SHIFT_DATE
+        )
+        GROUP BY SHIFT_MONTH
+        UNION ALL
+        SELECT SHIFT_DATE,SUM(TOTAL_TIME) TOTAL_TIME,SUM(ADD_TEST_RUNTIME) ADD_TEST_RUNTIME,SUM(RE_TEST_RUNTIME) RE_TEST_RUNTIME , SUM(TOTAL_TIME)-SUM(ADD_TEST_RUNTIME)-SUM(RE_TEST_RUNTIME) INLINE_TIME,
+        ROUND(SUM(ADD_TEST_RUNTIME)/SUM(TOTAL_TIME),4)*100 ADD_TEST_RATIO,
+        ROUND(SUM(RE_TEST_RUNTIME)/SUM(TOTAL_TIME),4)*100 RE_TEST_RATIO
+        FROM (
+        SELECT SHIFT_DATE,EQP_G,LOCATION, MAX(TOTAL_TIME) TOTAL_TIME,
+        SUM(CASE WHEN TEST_TYPE='A' THEN DURATION ELSE 0 END) ADD_TEST_RUNTIME,
+        SUM(CASE WHEN TEST_TYPE='R' THEN DURATION ELSE 0 END) RE_TEST_RUNTIME
+        FROM A3MFGYW1.EQPG_WAT_TEST_SUMMARY
+        --放查询条件
+        WHERE SHIFT_DATE BETWEEN TO_CHAR(SYSDATE-7.5/24 -30,'YYYYMMDD') AND TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD')
+        <if test="fab !='' and fab != null and fab !='N1'">
+            AND LOCATION=#{fab}
+        </if>
+        GROUP BY SHIFT_DATE,EQP_G,LOCATION
+        )
+        GROUP BY SHIFT_DATE
+        ) C ON A.SHIFT_DATE = C.SHIFT_DATE
+        ORDER BY A.FLAG,A.SHIFT_DATE
+    </select>
+
+
+    <select id="getMeasurementWATDetail" resultType="map">
+        SELECT LOCATION, FAB, LOT_ID, SHIFT_DATE, OPE_NO, NG_FLAG_WMS
+        , FINAL_JUDGE, PRODG, PRODUCT_OWNER_DEPT, TEST_PROGRAM, NUM_WAFER_TESTED
+        , NUM_WAFER_PASSED, NUM_WAFER_NG, PRODUCT_ID, EQUIPMENT_ID, PROCESS_START_TIME
+        , MEASURE_TIME, FAB_ID, EMPLOYEE_ID, PROBECARD, MA_REASON,TEST_TYPE, DURATION
+        FROM A3MFGYW1.EQPG_WAT_TEST_SUMMARY
+        WHERE 1=1
+        <if test="shiftDate !='' and shiftDate != null and shiftDate.length()==6">
+            AND SUBSTR(SHIFT_DATE,1,6) = #{shiftDate}
+        </if>
+        <if test="shiftDate !='' and shiftDate != null and shiftDate.length()==8">
+            AND SHIFT_DATE= #{shiftDate}
+        </if>
+        <if test="fab != null and fab != '' and fab !='N1'">
+            AND LOCATION = #{fab}
+        </if>
+    </select>
+
+    <select id="getLotPriorityRatioChart" resultType="map">
+        SELECT A.PRIORITY_TYPE,A.TARGET,NVL(B.WIP,0) WIP,SUM(NVL(B.WIP,0))OVER(ORDER BY 1) TOTAL_WIP,
+        ROUND(100*NVL(B.WIP,0)/SUM(NVL(B.WIP,0))OVER(ORDER BY 1),1) RATIO
+        FROM (
+        SELECT 'PRI_'||MIN_PRIORITY||'_'||MAX_PRIORITY PRIORITY_TYPE,TARGET,PUSH_PRIORITY
+        FROM A3MFGYW1.LOT_PRIORITY_TARGET
+        )A,
+        (
+        SELECT PRIORITY_TYPE,SUM(WAFER_QTY) WIP
+        FROM (
+        SELECT A.FAB,A.LOCATION,A.LOT_ID,A.WAFER_QTY,A.LOT_PRIORITY,
+        CASE WHEN LOT_PRIORITY&lt;=99 THEN 'PRI_1_99'
+        WHEN LOT_PRIORITY&gt;99 AND LOT_PRIORITY&lt;=199 THEN 'PRI_100_199'
+        WHEN LOT_PRIORITY&gt;199 AND LOT_PRIORITY&lt;=299 THEN 'PRI_200_299'
+        WHEN LOT_PRIORITY&gt;299 AND LOT_PRIORITY&lt;=399 THEN 'PRI_300_399'
+        WHEN LOT_PRIORITY&gt;399 AND LOT_PRIORITY&lt;=499 THEN 'PRI_400_499'
+        WHEN LOT_PRIORITY&gt;499 AND LOT_PRIORITY&lt;=599 THEN 'PRI_500_599'
+        WHEN LOT_PRIORITY&gt;599 AND LOT_PRIORITY&lt;=699 THEN 'PRI_600_699'
+        WHEN LOT_PRIORITY&gt;699 AND LOT_PRIORITY&lt;=799 THEN 'PRI_700_799'
+        WHEN LOT_PRIORITY&gt;799 AND LOT_PRIORITY&lt;=899 THEN 'PRI_800_899'
+        WHEN LOT_PRIORITY&gt;899 THEN 'PRI_900_999' END PRIORITY_TYPE
+        FROM A3MFGYW1.LOT_PRIORITY_HISTORY A,
+        A3MFGYW1.PRODG_INFO B
+        WHERE A.FAB=B.FAB AND A.PRODG1=B.PRODG1
+            AND TO_CHAR(A.UPDATE_TIME,'YYYYMMDD')=nvl(#{shiftDate},TO_CHAR(SYSDATE,'YYYYMMDD'))
+        AND TO_CHAR(A.UPDATE_TIME,'HH24')||':30'=nvl(#{hour},TO_CHAR(SYSDATE-0.5/24,'HH24')||':30')
+        <if test="fab !='' and fab != null and fab != 'N1'" >
+            AND A.FAB = #{fab}
+        </if>
+        <if test="location !='' and location != null and location != 'N1'" >
+            AND A.LOCATION = #{location}
+        </if>
+        <if test="tech !='' and tech !=null and tech !='all'">
+            AND B.TECH = #{tech}
+        </if>
+        )
+        GROUP BY PRIORITY_TYPE
+        )B
+        WHERE A.PRIORITY_TYPE=B.PRIORITY_TYPE(+)
+        ORDER BY A.PUSH_PRIORITY
+    </select>
+
+    <select id="getLotPriorityRatioTrendChartData" resultType="map">
+        SELECT SUBSTR(SHIFT_TIME,5) SHIFT_DATE,PRIORITY_TYPE,TOTAL,PRIORITY_QTY,
+        ROUND(100*PRIORITY_QTY/TOTAL,1) RATIO,TARGET
+        FROM (
+        SELECT A.SHIFT_TIME,A.TOTAL,A.PRIORITY_QTY,A.PRIORITY_TYPE,B.TARGET
+        FROM (
+        SELECT SHIFT_TIME,SUM(WAFER_QTY) TOTAL,SUM(DECODE(PRIORITY_TYPE,#{priority},WAFER_QTY,0)) PRIORITY_QTY
+        ,#{priority} PRIORITY_TYPE
+        FROM (
+        SELECT TO_CHAR(A.UPDATE_TIME,'YYYYMMDD')||' '||TO_CHAR(A.UPDATE_TIME,'HH24')||':30' SHIFT_TIME,
+        A.FAB,A.LOCATION,A.LOT_ID,A.WAFER_QTY,A.LOT_PRIORITY,
+        CASE WHEN LOT_PRIORITY&lt;=99 THEN 'PRI_1_99'
+        WHEN LOT_PRIORITY&gt;99 AND LOT_PRIORITY&lt;=199 THEN 'PRI_100_199'
+        WHEN LOT_PRIORITY&gt;199 AND LOT_PRIORITY&lt;=299 THEN 'PRI_200_299'
+        WHEN LOT_PRIORITY&gt;299 AND LOT_PRIORITY&lt;=399 THEN 'PRI_300_399'
+        WHEN LOT_PRIORITY&gt;399 AND LOT_PRIORITY&lt;=499 THEN 'PRI_400_499'
+        WHEN LOT_PRIORITY&gt;499 AND LOT_PRIORITY&lt;=599 THEN 'PRI_500_599'
+        WHEN LOT_PRIORITY&gt;599 AND LOT_PRIORITY&lt;=699 THEN 'PRI_600_699'
+        WHEN LOT_PRIORITY&gt;699 AND LOT_PRIORITY&lt;=799 THEN 'PRI_700_799'
+        WHEN LOT_PRIORITY&gt;799 AND LOT_PRIORITY&lt;=899 THEN 'PRI_800_899'
+        WHEN LOT_PRIORITY&gt;899 THEN 'PRI_900_999' END PRIORITY_TYPE
+        FROM A3MFGYW1.LOT_PRIORITY_HISTORY A,
+        A3MFGYW1.PRODG_INFO B
+        WHERE A.FAB=B.FAB AND A.PRODG1=B.PRODG1
+        AND A.SHIFT_DATE &gt;=
+        CASE WHEN #{startDate,jdbcType=VARCHAR} IS NOT NULL THEN #{startDate}
+        WHEN   #{endDate,jdbcType=VARCHAR} IS NOT NULL THEN TO_CHAR(TO_DATE(#{endDate},'YYYYMMDD')-2,'YYYYMMDD')
+        ELSE TO_CHAR(SYSDATE-7.5/24-2,'YYYYMMDD') END
+        AND A.SHIFT_DATE &lt;=
+        CASE WHEN #{endDate,jdbcType=VARCHAR} IS NOT NULL THEN #{endDate}
+        ELSE TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD') END
+        <if test="fab !='' and fab != null and fab != 'N1'" >
+            AND A.FAB = #{fab}
+        </if>
+        <if test="location !='' and location != null and location != 'N1'" >
+            AND A.LOCATION = #{location}
+        </if>
+        <if test="tech !='' and tech !=null and tech !='all'">
+            AND B.TECH = #{tech}
+        </if>
+        )
+        GROUP BY SHIFT_TIME
+        )A,
+        (
+        SELECT 'PRI_'||MIN_PRIORITY||'_'||MAX_PRIORITY AS PRIORITY_TYPE,TARGET,PUSH_PRIORITY
+        FROM A3MFGYW1.LOT_PRIORITY_TARGET
+        )B
+        WHERE A.PRIORITY_TYPE=B.PRIORITY_TYPE(+)
+        )
+        ORDER BY SHIFT_TIME
+    </select>
+
+    <select id="getCrackEqpIdList" resultType="mfg.reporting.dto.CommonSelectDTO">
+        SELECT
+        DISTINCT EQP_ID label,EQP_ID value
+        FROM PWEB.EQP_ID_USE_STD WHERE EQP_G = 'CS_GRD_STK' AND LENGTH(EQP_ID)=5
+        UNION ALL
+        SELECT
+        DISTINCT EQP_ID label,EQP_ID value
+        FROM PWEB.EQP_ID_USE_STD_A3 WHERE EQP_G = 'CS_GRD_STK'AND LENGTH(EQP_ID)=6
+    </select>
+
+    <select id="getCrackInfoByLot" resultType="map">
+        SELECT SHIFT_MONTH,MOVE,CRACK,NVL(RATIO,0)RATIO
+        FROM (
+        SELECT SHIFT_MONTH,ROUND(AVG(MOVE)) MOVE,ROUND(AVG(CRACK)) CRACK,
+        ROUND(100*(CASE WHEN AVG(MOVE)&gt;0 THEN AVG(CRACK)/AVG(MOVE) END),1) RATIO
+        FROM (
+        SELECT SUBSTR(A1.SHIFT_DATE,1,6) SHIFT_MONTH,A1.SHIFT_DATE,A1.MOVE,NVL(A2.CRACK,0) CRACK,
+        ROUND(100*(CASE WHEN A1.MOVE&gt;0 THEN NVL(A2.CRACK,0)/A1.MOVE END),1) RATIO
+        FROM (
+        SELECT SHIFT_DATE,SUM(MOVE_COUNT) MOVE
+        FROM A3MFGYW1.EQPG_MOVE_COUNT
+        WHERE SHIFT_DATE&gt;=TO_CHAR(TRUNC(SYSDATE-7.5/24-1,'YYYY'),'YYYYMMDD') --AND LOCATION='N1A3'
+        GROUP BY SHIFT_DATE
+        )A1,
+        (
+        SELECT SHIFT_DATE,COUNT(CHILD_QTY) CRACK
+        FROM (
+        SELECT SHIFT_DATE,CHILD_LOT_ID,CHILD_QTY,EQP_ID,EQPG_MOVE,EQPG_COUNT
+        FROM A3MFGYW1.CRACK_LOT
+        WHERE SHIFT_DATE&gt;=TO_CHAR(TRUNC(SYSDATE-7.5/24-1,'YYYY'),'YYYYMMDD') -- AND EQP_ID = 'CSD302'
+        <if test="eqpId !='' and eqpId != null and eqpId != 'all'">
+            AND EQP_ID=#{eqpId}
+        </if>
+        )
+        GROUP BY SHIFT_DATE
+        )A2
+        WHERE A1.SHIFT_DATE=A2.SHIFT_DATE(+)
+        )
+        GROUP BY SHIFT_MONTH
+        UNION ALL
+        SELECT A1.SHIFT_DATE,A1.MOVE,NVL(A2.CRACK,0) CRACK,
+        ROUND(100*(CASE WHEN A1.MOVE&gt;0 THEN NVL(A2.CRACK,0)/A1.MOVE END),1) RATIO
+        FROM (
+        SELECT SHIFT_DATE,SUM(MOVE_COUNT) MOVE
+        FROM A3MFGYW1.EQPG_MOVE_COUNT
+        WHERE SHIFT_DATE&gt;=TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') --AND LOCATION='N1A3'
+        GROUP BY SHIFT_DATE
+        )A1,
+        (
+        SELECT SHIFT_DATE,COUNT(CHILD_QTY) CRACK
+        FROM (
+        SELECT SHIFT_DATE,CHILD_LOT_ID,CHILD_QTY,EQP_ID,EQPG_MOVE,EQPG_COUNT
+        FROM A3MFGYW1.CRACK_LOT
+        WHERE SHIFT_DATE&gt;=TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD')
+        -- AND EQP_ID = 'CSD302'
+        <if test="eqpId !='' and eqpId != null and eqpId != 'all'">
+            AND EQP_ID=#{eqpId}
+        </if>
+        )
+        GROUP BY SHIFT_DATE
+        )A2
+        WHERE A1.SHIFT_DATE=A2.SHIFT_DATE(+)
+        )
+        ORDER BY LENGTH(SHIFT_MONTH),SHIFT_MONTH
+    </select>
+
+    <select id="getCrackInfoByWafer" resultType="map">
+        SELECT SHIFT_MONTH,MOVE,CRACK,NVL(RATIO,0)RATIO
+        FROM (
+        SELECT SHIFT_MONTH,ROUND(AVG(MOVE)) MOVE,ROUND(AVG(CRACK)) CRACK,
+        ROUND(100*(CASE WHEN AVG(MOVE)&gt;0 THEN AVG(CRACK)/AVG(MOVE) END),1) RATIO
+        FROM (
+        SELECT SUBSTR(A1.SHIFT_DATE,1,6) SHIFT_MONTH,A1.SHIFT_DATE,A1.MOVE,NVL(A2.CRACK,0) CRACK,
+        ROUND(100*(CASE WHEN A1.MOVE&gt;0 THEN NVL(A2.CRACK,0)/A1.MOVE END),1) RATIO
+        FROM (
+        SELECT SHIFT_DATE,SUM(MOVE) MOVE
+        FROM A3MFGYW1.EQPG_MOVE_COUNT
+        WHERE SHIFT_DATE&gt;=TO_CHAR(TRUNC(SYSDATE-7.5/24-1,'YYYY'),'YYYYMMDD') --AND LOCATION='N1A3'
+        GROUP BY SHIFT_DATE
+        )A1,
+        (
+        SELECT SHIFT_DATE,SUM(CHILD_QTY) CRACK
+        FROM (
+        SELECT SHIFT_DATE,CHILD_LOT_ID,CHILD_QTY,EQP_ID,EQPG_MOVE,EQPG_COUNT
+        FROM A3MFGYW1.CRACK_LOT
+        WHERE SHIFT_DATE&gt;=TO_CHAR(TRUNC(SYSDATE-7.5/24-1,'YYYY'),'YYYYMMDD') -- AND EQP_ID = 'CSD302'
+        <if test="eqpId !='' and eqpId != null and eqpId != 'all'">
+            AND EQP_ID=#{eqpId}
+        </if>
+        )
+        GROUP BY SHIFT_DATE
+        )A2
+        WHERE A1.SHIFT_DATE=A2.SHIFT_DATE(+)
+        )
+        GROUP BY SHIFT_MONTH
+        UNION ALL
+        SELECT A1.SHIFT_DATE,A1.MOVE,NVL(A2.CRACK,0) CRACK,
+        ROUND(100*(CASE WHEN A1.MOVE&gt;0 THEN NVL(A2.CRACK,0)/A1.MOVE END),1) RATIO
+        FROM (
+        SELECT SHIFT_DATE,SUM(MOVE) MOVE
+        FROM A3MFGYW1.EQPG_MOVE_COUNT
+        WHERE SHIFT_DATE&gt;=TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') --AND LOCATION='N1A3'
+        GROUP BY SHIFT_DATE
+        )A1,
+        (
+        SELECT SHIFT_DATE,SUM(CHILD_QTY) CRACK
+        FROM (
+        SELECT SHIFT_DATE,CHILD_LOT_ID,CHILD_QTY,EQP_ID,EQPG_MOVE,EQPG_COUNT
+        FROM A3MFGYW1.CRACK_LOT
+        WHERE SHIFT_DATE&gt;=TO_CHAR(SYSDATE-7.5/24-30,'YYYYMMDD') -- AND EQP_ID = 'CSD302'
+        <if test="eqpId !='' and eqpId != null and eqpId != 'all'">
+            AND EQP_ID=#{eqpId}
+        </if>
+        )
+        GROUP BY SHIFT_DATE
+        )A2
+        WHERE A1.SHIFT_DATE=A2.SHIFT_DATE(+)
+        )
+        ORDER BY LENGTH(SHIFT_MONTH),SHIFT_MONTH
+    </select>
+
+
+    <select id="getMeasurementSRTargetInfo" resultType="map">
+        SELECT EQP_G,SR FROM A3MFGYW1.T_OPD_SR
+    </select>
+
+    <select id="validMeasurementSRTargetInfo" resultType="map">
+        SELECT EQP_G,SR FROM A3MFGYW1.T_OPD_SR WHERE EQP_G=#{eqpg}
+    </select>
+
+    <select id="insertMeasurementSRTargetInfo">
+        insert into A3MFGYW1.T_OPD_SR(EQP_G,SR,UPDATE_TIME) values(#{eqpg},#{sr},SYSDATE)
+    </select>
+
+    <select id="updateMeasurementSRTargetInfo">
+        UPDATE A3MFGYW1.T_OPD_SR SET SR=#{sr},UPDATE_TIME=SYSDATE WHERE EQP_G=#{eqpg}
+    </select>
+
+
+    <select id="getA3SelfMoveRatioInfo" resultType="map">
+        WITH  MONTH_LIST AS(
+        SELECT DISTINCT SUBSTR(A.SHIFT_DATE,0,4) AS SHIFT_YEAR,SUBSTR(A.SHIFT_DATE,0,6) AS SHIFT_MONTH
+        , SUBSTR(A.SHIFT_DATE,0,6) AS SHIFT_DATE
+        FROM A3MFGYW1.CLIP_CALENDAR A
+        WHERE A.SHIFT_MONTH&gt;=TO_CHAR(ADD_MONTHS(TRUNC(SYSDATE-7.5/24, 'MM'), -11), 'YYYYMM')
+        AND A.SHIFT_DATE &lt;=TO_CHAR(SYSDATE-7.5/24-1, 'YYYYMMDD')
+        AND A.SHIFT_DATE&gt;= '20260101'
+        ),DATE_LIST AS(
+        SELECT DISTINCT SUBSTR(A.SHIFT_DATE,0,4) AS SHIFT_YEAR,SUBSTR(A.SHIFT_DATE,0,6) AS SHIFT_MONTH, A.SHIFT_DATE
+        FROM A3MFGYW1.CLIP_CALENDAR A
+        WHERE A.SHIFT_DATE&gt;=TO_CHAR(SYSDATE-7.5/24-30, 'YYYYMMDD')
+        AND A.SHIFT_DATE &lt;=TO_CHAR(SYSDATE-7.5/24-1, 'YYYYMMDD')
+        AND A.SHIFT_DATE&gt;= '20260101'
+        ),MODULE_TARGET AS(
+        SELECT
+        KEY1 MODULE,TO_NUMBER(KEY2) TARGET
+        FROM A1_MFG.CRITICLE_COMMENT_SUMMARY
+        WHERE FUNCTION_NAME = 'A3MoveSelfRatioTarget' AND KEY1 IN('PHOTO','ETCH','TF','DIFF','WET','CMP','METRO','TOTAL')
+        )
+        SELECT C.SHIFT_DATE,C.MODULE,ROUND(D.RATIO,1)RATIO,ROUND(E.TARGET,1)TARGET FROM(
+        SELECT SHIFT_DATE,MODULE FROM(
+        SELECT SHIFT_MONTH SHIFT_DATE FROM MONTH_LIST
+        UNION ALL
+        SELECT SHIFT_DATE FROM DATE_LIST
+        )A LEFT JOIN (
+        SELECT 'PHOTO' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'ETCH' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'TF' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'DIFF' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'WET' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'CMP' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'METRO' MODULE FROM DUAL
+        UNION ALL
+        SELECT 'TOTAL' MODULE FROM DUAL
+        )B
+        ON 1=1
+        )C LEFT JOIN(
+        SELECT
+        SHIFT_DATE,NVL(MODULE,'TOTAL')MODULE,CASE WHEN A3_PRODUCT_MOVE&gt;0 THEN NVL(A3_SELF_MOVE,0)*100/A3_PRODUCT_MOVE END  RATIO
+        FROM(
+        SELECT
+        A.SHIFT_MONTH SHIFT_DATE,NVL(B.MODULE,'TOTAL') MODULE,SUM(B.A3_PRODUCT_MOVE )A3_PRODUCT_MOVE,SUM(B.A3_SELF_MOVE )A3_SELF_MOVE
+        FROM MONTH_LIST A
+        LEFT JOIN A1_MFG.CRITICLE_N1A3_MOVE_INFO B
+        ON A.SHIFT_DATE = SUBSTR(B.SHIFT_DATE,1,6)
+        WHERE B.MODULE IS NOT NULL
+        GROUP BY ROLLUP(B.MODULE),A.SHIFT_MONTH
+        )
+        UNION ALL
+        SELECT
+        SHIFT_DATE,MODULE,CASE WHEN A3_PRODUCT_MOVE&gt;0 THEN ROUND( NVL(A3_SELF_MOVE,0)*100/A3_PRODUCT_MOVE,1) END  RATIO
+        FROM(
+        SELECT
+        A.SHIFT_DATE,NVL(B.MODULE,'TOTAL')MODULE ,SUM(B.A3_PRODUCT_MOVE )A3_PRODUCT_MOVE,SUM(B.A3_SELF_MOVE )A3_SELF_MOVE
+        FROM DATE_LIST A
+        LEFT JOIN A1_MFG.CRITICLE_N1A3_MOVE_INFO B
+        ON A.SHIFT_DATE = B.SHIFT_DATE
+        WHERE B.MODULE IS NOT NULL
+        GROUP BY ROLLUP(B.MODULE),A.SHIFT_DATE
+        ))D
+        ON C.SHIFT_DATE = D.SHIFT_DATE AND C.MODULE = D.MODULE
+        LEFT JOIN MODULE_TARGET E
+        ON C.MODULE = E.MODULE
+        ORDER BY LENGTH(C.SHIFT_DATE),C.SHIFT_DATE
+    </select>
+
+    <select id="getA3SelfMoveRatioInfoByEQPG" resultType="map">
+        WITH  MONTH_LIST AS(
+        SELECT DISTINCT SUBSTR(A.SHIFT_DATE,0,4) AS SHIFT_YEAR,SUBSTR(A.SHIFT_DATE,0,6) AS SHIFT_MONTH
+        , SUBSTR(A.SHIFT_DATE,0,6) AS SHIFT_DATE
+        FROM A3MFGYW1.CLIP_CALENDAR A
+        WHERE A.SHIFT_MONTH&gt;=TO_CHAR(ADD_MONTHS(TRUNC(SYSDATE-7.5/24, 'MM'), -11), 'YYYYMM')
+        AND A.SHIFT_DATE &lt;=TO_CHAR(SYSDATE-7.5/24-1, 'YYYYMMDD')
+        AND A.SHIFT_DATE&gt;= '20260101'
+        ),DATE_LIST AS(
+        SELECT DISTINCT SUBSTR(A.SHIFT_DATE,0,4) AS SHIFT_YEAR,SUBSTR(A.SHIFT_DATE,0,6) AS SHIFT_MONTH, A.SHIFT_DATE
+        FROM A3MFGYW1.CLIP_CALENDAR A
+        WHERE A.SHIFT_DATE&gt;=TO_CHAR(SYSDATE-7.5/24-30, 'YYYYMMDD')
+        AND A.SHIFT_DATE &lt;=TO_CHAR(SYSDATE-7.5/24-1, 'YYYYMMDD')
+        AND A.SHIFT_DATE&gt;= '20260101'
+        ),EQPG_TARGET AS(
+        SELECT
+        KEY1 EQP_G,TO_NUMBER(KEY2) TARGET
+        FROM A1_MFG.CRITICLE_COMMENT_SUMMARY
+        WHERE FUNCTION_NAME = 'A3MoveSelfRatioTarget'
+        )
+        SELECT C.SHIFT_DATE,C.EQP_G,ROUND(D.RATIO,1)RATIO,ROUND(E.TARGET,1)TARGET
+        ,D.A3_PRODUCT_MOVE ,D.A3_SELF_MOVE
+        FROM(
+        SELECT SHIFT_DATE,EQP_G FROM(
+        SELECT SHIFT_MONTH SHIFT_DATE FROM MONTH_LIST
+        UNION ALL
+        SELECT SHIFT_DATE FROM DATE_LIST
+        )A LEFT JOIN (
+        SELECT DISTINCT  EQP_G FROM A1_MFG.CRITICLE_N1A3_MOVE_INFO
+        WHERE MODULE =#{module,jdbcType=VARCHAR} AND NVL(A3_EQP_MOVE,0)&gt;0 AND NVL(A3_PRODUCT_MOVE,0)&gt;0
+        UNION ALL
+        SELECT #{module,jdbcType=VARCHAR} EQP_G FROM DUAL
+        )B
+        ON 1=1
+        )C LEFT JOIN(
+        SELECT
+        SHIFT_DATE,EQP_G,A3_PRODUCT_MOVE,A3_SELF_MOVE
+        ,CASE WHEN A3_PRODUCT_MOVE&gt;0 THEN NVL(A3_SELF_MOVE,0)*100/A3_PRODUCT_MOVE END  RATIO
+        FROM(
+        SELECT
+        A.SHIFT_MONTH SHIFT_DATE,NVL(B.EQP_G,#{module,jdbcType=VARCHAR}) EQP_G,SUM(B.A3_PRODUCT_MOVE )A3_PRODUCT_MOVE,SUM(B.A3_SELF_MOVE )A3_SELF_MOVE
+        FROM MONTH_LIST A
+        LEFT JOIN A1_MFG.CRITICLE_N1A3_MOVE_INFO B
+        ON A.SHIFT_DATE = SUBSTR(B.SHIFT_DATE,1,6)
+        WHERE B.MODULE = #{module,jdbcType=VARCHAR}
+        GROUP BY ROLLUP(B.EQP_G),A.SHIFT_MONTH
+        )
+        UNION ALL
+        SELECT
+        SHIFT_DATE,EQP_G,A3_PRODUCT_MOVE,A3_SELF_MOVE,CASE WHEN A3_PRODUCT_MOVE&gt;0 THEN ROUND(NVL(A3_SELF_MOVE,0)*100/A3_PRODUCT_MOVE,1) END  RATIO
+        FROM(
+        SELECT
+        A.SHIFT_DATE,NVL(B.EQP_G,#{module,jdbcType=VARCHAR})EQP_G ,SUM(B.A3_PRODUCT_MOVE )A3_PRODUCT_MOVE,SUM(B.A3_SELF_MOVE )A3_SELF_MOVE
+        FROM DATE_LIST A
+        LEFT JOIN A1_MFG.CRITICLE_N1A3_MOVE_INFO B
+        ON A.SHIFT_DATE = B.SHIFT_DATE
+        WHERE B.MODULE = #{module,jdbcType=VARCHAR}
+        GROUP BY ROLLUP(B.EQP_G),A.SHIFT_DATE
+        ))D
+        ON C.SHIFT_DATE = D.SHIFT_DATE AND C.EQP_G = D.EQP_G
+        LEFT JOIN (
+        SELECT
+        EQP_G,CASE WHEN SUM(A3_PRODUCT_MOVE * DECODE(TARGET,NULL,NULL,1)) &gt; 0 THEN  SUM(A3_PRODUCT_MOVE * TARGET)/SUM(A3_PRODUCT_MOVE * DECODE(TARGET,NULL,NULL,1)) END TARGET
+        FROM(
+        SELECT
+        B.EQP_G,B.MODULE,SUM(B.A3_PRODUCT_MOVE )A3_PRODUCT_MOVE,MAX(C.TARGET )TARGET
+        FROM DATE_LIST A
+        LEFT JOIN A1_MFG.CRITICLE_N1A3_MOVE_INFO B
+        ON A.SHIFT_DATE = B.SHIFT_DATE
+        LEFT JOIN EQPG_TARGET C
+        ON B.EQP_G = C.EQP_G
+        WHERE C.TARGET IS NOT NULL
+        GROUP BY B.EQP_G,B.MODULE
+        )GROUP BY EQP_G
+        UNION ALL
+        SELECT
+        NVL(MODULE,'TOTAL')MODULE,CASE WHEN SUM(A3_PRODUCT_MOVE * DECODE(TARGET,NULL,NULL,1)) &gt; 0 THEN  SUM(A3_PRODUCT_MOVE * TARGET)/SUM(A3_PRODUCT_MOVE * DECODE(TARGET,NULL,NULL,1)) END TARGET
+        FROM(
+        SELECT
+        B.EQP_G,B.MODULE,SUM(B.A3_PRODUCT_MOVE )A3_PRODUCT_MOVE,MAX(C.TARGET )TARGET
+        FROM DATE_LIST A
+        LEFT JOIN A1_MFG.CRITICLE_N1A3_MOVE_INFO B
+        ON A.SHIFT_DATE = B.SHIFT_DATE
+        LEFT JOIN EQPG_TARGET C
+        ON B.EQP_G = C.EQP_G
+        WHERE C.TARGET IS NOT NULL
+        AND NVL(B.A3_EQP_MOVE,0)&gt;0 AND NVL(B.A3_PRODUCT_MOVE,0)&gt;0
+        GROUP BY B.EQP_G,B.MODULE
+        )GROUP BY ROLLUP(MODULE)
+        )E
+        ON C.EQP_G = E.EQP_G
+        ORDER BY DECODE(C.EQP_G,#{module,jdbcType=VARCHAR},2,1) ,LENGTH(C.SHIFT_DATE),C.SHIFT_DATE
+    </select>
+
+    <select id="getSelfMoveRatioInfoByeqpId" resultType="map">
+        WITH  MONTH_LIST AS(
+        SELECT DISTINCT SUBSTR(A.SHIFT_DATE,0,4) AS SHIFT_YEAR,SUBSTR(A.SHIFT_DATE,0,6) AS SHIFT_MONTH
+        , SUBSTR(A.SHIFT_DATE,0,6) AS SHIFT_DATE
+        FROM A3MFGYW1.CLIP_CALENDAR A
+        WHERE A.SHIFT_MONTH&gt;=TO_CHAR(ADD_MONTHS(TRUNC(SYSDATE-7.5/24, 'MM'), -11), 'YYYYMM')
+        AND A.SHIFT_DATE &lt;=TO_CHAR(SYSDATE-7.5/24-1, 'YYYYMMDD')
+        AND A.SHIFT_DATE&gt;= '20260101'
+        ),DATE_LIST AS(
+        SELECT DISTINCT SUBSTR(A.SHIFT_DATE,0,4) AS SHIFT_YEAR,SUBSTR(A.SHIFT_DATE,0,6) AS SHIFT_MONTH, A.SHIFT_DATE
+        FROM A3MFGYW1.CLIP_CALENDAR A
+        WHERE A.SHIFT_DATE&gt;=TO_CHAR(SYSDATE-7.5/24-30, 'YYYYMMDD')
+        AND A.SHIFT_DATE &lt;=TO_CHAR(SYSDATE-7.5/24-1, 'YYYYMMDD')
+        AND A.SHIFT_DATE&gt;= '20260101'
+        ),EQPG_TARGET AS(
+        SELECT
+        KEY1 EQP_G,TO_NUMBER(KEY2) TARGET
+        FROM A1_MFG.CRITICLE_COMMENT_SUMMARY
+        WHERE FUNCTION_NAME = 'A3MoveSelfRatioTarget' AND KEY1 = #{eqpg,jdbcType=VARCHAR}
+        )
+        SELECT C.SHIFT_DATE,C.EQP_ID,ROUND(D.RATIO,1)RATIO,ROUND(E.TARGET,1)TARGET
+        ,D.A3_PRODUCT_MOVE ,D.A3_SELF_MOVE
+        FROM(
+        SELECT SHIFT_DATE,EQP_ID FROM(
+        SELECT SHIFT_MONTH SHIFT_DATE FROM MONTH_LIST
+        UNION ALL
+        SELECT SHIFT_DATE FROM DATE_LIST
+        )A LEFT JOIN (
+        SELECT DISTINCT  EQP_ID FROM  PWEB.EQP_ID_USE_STD@A3PDW  WHERE EQP_G =#{eqpg,jdbcType=VARCHAR} AND ACTIVE_FLAG ='Y' AND LENGTH(EQP_ID)=6
+        )B
+        ON 1=1
+        )C LEFT JOIN(
+        SELECT
+        SHIFT_DATE,EQP_ID,A3_PRODUCT_MOVE,A3_SELF_MOVE
+        ,CASE WHEN A3_PRODUCT_MOVE&gt;0 THEN NVL(A3_SELF_MOVE,0)*100/A3_PRODUCT_MOVE END  RATIO
+        FROM(
+        SELECT
+        SHIFT_MONTH SHIFT_DATE,NVL(EQP_ID,#{eqpg,jdbcType=VARCHAR}) EQP_ID,SUM(CASE WHEN LOCATION = 'N1A3' THEN WAFER_QTY ELSE 0 END )A3_PRODUCT_MOVE
+        ,SUM(CASE WHEN FAB = 'N1A3' AND LOCATION='N1A3' THEN WAFER_QTY ELSE 0 END )A3_SELF_MOVE
+        FROM (
+        SELECT A.SHIFT_MONTH,B.EQP_ID,LOCATION,FAB,WAFER_QTY
+        FROM MONTH_LIST A
+        LEFT JOIN A3MFGYW1.MOVE_SUMMARY B
+        ON A.SHIFT_DATE = SUBSTR(B.SHIFT_DATE,1,6)
+        WHERE B. EQP_G =#{eqpg,jdbcType=VARCHAR}
+        AND MOVE_FLAG ='1' AND REWORK_MOVE_FLAG ='0' AND NENG_FLAG ='1' AND NVL(EQP_G,'OQC_Tester') &lt;&gt;'OQC_Tester'
+        UNION ALL
+        SELECT A.SHIFT_MONTH,B.EQP_ID,LOCATION,FAB,WAFER_QTY
+        FROM MONTH_LIST A
+        LEFT JOIN A3MFGYW1.MOVE_SUMMARY_ARC B
+        ON A.SHIFT_DATE = SUBSTR(B.SHIFT_DATE,1,6)
+        WHERE  B.EQP_G =#{eqpg,jdbcType=VARCHAR}
+        AND MOVE_FLAG ='1' AND REWORK_MOVE_FLAG ='0' AND NENG_FLAG ='1' AND NVL(EQP_G,'OQC_Tester') &lt;&gt;'OQC_Tester'
+        )GROUP BY ROLLUP(EQP_ID),SHIFT_MONTH
+        )
+        UNION ALL
+        SELECT
+        SHIFT_DATE,EQP_ID,A3_PRODUCT_MOVE,A3_SELF_MOVE,CASE WHEN A3_PRODUCT_MOVE&gt;0 THEN ROUND(NVL(A3_SELF_MOVE,0)*100/A3_PRODUCT_MOVE,1) END  RATIO
+        FROM(
+        SELECT
+        A.SHIFT_DATE,NVL(B.EQP_ID,#{eqpg,jdbcType=VARCHAR})EQP_ID ,SUM(CASE WHEN LOCATION = 'N1A3' THEN WAFER_QTY ELSE 0 END )A3_PRODUCT_MOVE
+        ,SUM(CASE WHEN FAB = 'N1A3' AND LOCATION='N1A3' THEN WAFER_QTY ELSE 0 END )A3_SELF_MOVE
+        FROM DATE_LIST A
+        LEFT JOIN A3MFGYW1.MOVE_SUMMARY B
+        ON A.SHIFT_DATE = B.SHIFT_DATE
+        WHERE  B.EQP_G =#{eqpg,jdbcType=VARCHAR}
+        GROUP BY ROLLUP(B.EQP_ID),A.SHIFT_DATE
+        ))D
+        ON C.SHIFT_DATE = D.SHIFT_DATE AND C.EQP_ID = D.EQP_ID
+        LEFT JOIN (
+        SELECT EQP_G,TARGET FROM EQPG_TARGET
+        )E
+        ON 1=1
+        ORDER BY LENGTH(C.SHIFT_DATE),C.SHIFT_DATE
+    </select>
+
+
+    <select id="getA3SelfMoveAlarmRatioInfo" resultType="map">
+        SELECT EQP_G,RATIO,TARGET,TARGET_GAP,GAP  FROM  A1_MFG.CRITICLE_N1A3_MOVE_ALARM_INFO
+        WHERE WEEK_SEQ = (
+        SELECT WEEK_SEQ FROM A3MFGYW1.CLIP_CALENDAR  E
+        WHERE SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD')
+        ) AND GAP > TARGET_GAP
+    </select>
+
+    <select id="getA3SelfMoveAlarmRatioInfoByEqpG" resultType="map">
+        <![CDATA[
+        SELECT A.*,B.REASON,B.ACTION,B.DUE_DATE FROM(
+        SELECT WEEK_SEQ,EQP_G,MODULE,A3_SELF_MOVE,A3_PRODUCT_MOVE,RATIO,TARGET,GAP  FROM  A1_MFG.CRITICLE_N1A3_MOVE_ALARM_INFO
+        WHERE WEEK_SEQ = (
+        SELECT WEEK_SEQ FROM A3MFGYW1.CLIP_CALENDAR  E
+        WHERE SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD')
+        ) AND GAP > TARGET_GAP
+        )A LEFT JOIN(
+        SELECT
+        EQP_G,LISTAGG(REASON)WITHIN GROUP(ORDER BY CREATE_TIME)REASON
+        ,LISTAGG(ACTION)WITHIN GROUP(ORDER BY CREATE_TIME)ACTION
+        ,LISTAGG(DUE_DATE)WITHIN GROUP(ORDER BY CREATE_TIME)DUE_DATE
+        FROM(
+        SELECT
+        EQP_G,'<div class="LINE_SPLIT">'||REASON||'</div>' REASON
+        ,CASE WHEN STATUS = '2' THEN   '<div class="LINE_SPLIT SUCCESS_LINE">'|| ACTION  ||  '</div>'
+        WHEN STATUS = '1' THEN '<div class="LINE_SPLIT DONE_LINE">'|| ACTION  ||  '</div>'
+        WHEN STATUS = '0' AND  TRUNC(SYSDATE-7.5/24)-TO_DATE(DUE_DATE,'YYYY-MM-DD')>0 THEN '<div class="LINE_SPLIT DUE_DATE_ALARM">'|| ACTION  ||  '</div>'
+        ELSE  '<div class="LINE_SPLIT">'|| ACTION  ||  '</div>' END  ACTION
+        ,CASE WHEN STATUS = '0'  AND  TRUNC(SYSDATE-7.5/24)-TO_DATE(DUE_DATE,'YYYY-MM-DD')>0 THEN '<div class="LINE_SPLIT DUE_DATE_ALARM">'|| DUE_DATE  ||  '</div>'
+        WHEN STATUS = '1' THEN  '<div class="LINE_SPLIT DONE_LINE">'|| DUE_DATE  ||  '</div>'
+        WHEN STATUS = '2' THEN  '<div class="LINE_SPLIT SUCCESS_LINE">'|| DUE_DATE  ||  '</div>'
+        ELSE  '<div class="LINE_SPLIT">'|| DUE_DATE  ||  '</div>' END  DUE_DATE
+        ,CREATE_TIME
+        FROM A1_MFG.CRITICLE_N1A3_MOVE_ALARM_REASON
+        WHERE STATUS IN('0','1') OR (STATUS='2' AND (
+        SELECT WEEK_SEQ FROM A3MFGYW1.CLIP_CALENDAR WHERE SHIFT_DATE = TO_CHAR(UPDATE_TIME-7.5/24,'YYYYMMDD')
+        ) = (
+        SELECT WEEK_SEQ FROM A3MFGYW1.CLIP_CALENDAR WHERE SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD')
+        ))
+        )GROUP BY EQP_G
+        )B
+        ON A.EQP_G = B.EQP_G
+        ]]>
+    </select>
+
+    <insert id="insertA3SelfMoveAction">
+        INSERT INTO A1_MFG.CRITICLE_N1A3_MOVE_ALARM_REASON(WEEK_SEQ,MODULE,EQP_G,REASON,"ACTION",DUE_DATE,STATUS,CREATE_USER,CREATE_TIME,UPDATE_USER,UPDATE_TIME)
+        VALUES(#{WEEK_SEQ},#{MODULE},#{EQP_G},#{REASON},#{ACTION},#{DUE_DATE},'0',#{CREATE_USER},SYSDATE,#{UPDATE_USER},SYSDATE)
+    </insert>
+
+    <select id="getA3SelfMoveAlarmDetails" resultType="map">
+        SELECT
+        WEEK_SEQ,MODULE,EQP_G,REASON,"ACTION",DUE_DATE,STATUS,CREATE_TIME
+        ,CASE WHEN TRUNC(SYSDATE-7.5/24)-TO_DATE(DUE_DATE,'YYYY-MM-DD') &gt; 0 THEN '1' ELSE '0' END OVER_FLAG
+        FROM A1_MFG.CRITICLE_N1A3_MOVE_ALARM_REASON
+        <if test="status=='OnGoing'">
+            WHERE STATUS IN('0' ,'1')
+        </if>
+        <if test="status=='Done'">
+            WHERE STATUS = '2'
+        </if>
+    </select>
+
+    <select id="updateA3SelfMoveActionStatus">
+        UPDATE A1_MFG.CRITICLE_N1A3_MOVE_ALARM_REASON
+        SET STATUS = nvl(#{STATUS,jdbcType=VARCHAR},STATUS)
+        ,UPDATE_USER = #{UPDATE_USER,jdbcType=VARCHAR}
+        ,UPDATE_TIME = SYSDATE
+        ,DUE_DATE = nvl(#{DUE_DATE,jdbcType=VARCHAR},DUE_DATE)
+        ,REASON = nvl(#{REASON,jdbcType=VARCHAR},REASON)
+        ,ACTION = nvl(#{ACTION,jdbcType=VARCHAR},ACTION)
+        WHERE WEEK_SEQ = #{WEEK_SEQ,jdbcType=VARCHAR}
+        AND MODULE = #{MODULE,jdbcType=VARCHAR}
+        AND EQP_G = #{EQP_G,jdbcType=VARCHAR}
+        AND TO_CHAR(CREATE_TIME,'YYYY-MM-DD HH24:MI:SS') = #{CREATE_TIME,jdbcType=VARCHAR}
+    </select>
+
+    <select id="getA3SelfMoveRatioBackupRatio" resultType="map">
+        WITH DATE_LIST AS(
+        SELECT
+        MAX(CASE WHEN RN=2 THEN MIN_SHIFT_DATE END) START_DATE
+        ,MAX(CASE WHEN RN=1 THEN MAX_SHIFT_DATE END) END_DATE
+        ,SUM(WEEK_DAY)WEEK_DAY
+        FROM(
+        SELECT
+        MAX_SHIFT_DATE,MIN_SHIFT_DATE,WEEK_DAY,RN
+        FROM(
+        SELECT
+        WEEK_SEQ,MAX_SHIFT_DATE,MIN_SHIFT_DATE,WEEK_DAY
+        ,ROW_NUMBER()OVER(PARTITION BY 1 ORDER BY MAX_SHIFT_DATE DESC)RN
+        FROM(
+        SELECT
+        WEEK_SEQ,MAX(SHIFT_DATE)MAX_SHIFT_DATE,MIN(SHIFT_DATE) MIN_SHIFT_DATE
+        ,COUNT(1) WEEK_DAY
+        ,MAX(CASE WHEN SHIFT_DATE = TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD') THEN WEEK_SEQ END)CUR_WEEK
+        FROM A3MFGYW1.CLIP_CALENDAR
+        WHERE SHIFT_DATE &lt; =TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD')
+        GROUP BY WEEK_SEQ
+        ) WHERE CUR_WEEK IS  NULL
+        )WHERE RN&lt;=2
+        ))
+        SELECT
+        EQP_G,BACKUP_A3_MOVE,RATIO
+        ,CASE WHEN LAG(RATIO)OVER(PARTITION BY 1ORDER BY BACKUP_A3_MOVE DESC) &lt; 80 AND RATIO &gt; 80 THEN 1 ELSE 0 END FLAG
+        FROM(
+        SELECT
+        EQP_G,ROUND(BACKUP_A3_MOVE)BACKUP_A3_MOVE,CASE WHEN BACKUP_A3_MOVE_ALL &gt;0 THEN ROUND(BACKUP_A3_MOVE_ACC*100/BACKUP_A3_MOVE_ALL,1) END RATIO
+        FROM(
+        SELECT
+        EQP_G,BACKUP_A3_MOVE,SUM(BACKUP_A3_MOVE)OVER(PARTITION BY 1 ORDER BY BACKUP_A3_MOVE DESC)BACKUP_A3_MOVE_ACC
+        ,SUM(BACKUP_A3_MOVE)OVER(PARTITION BY 1) BACKUP_A3_MOVE_ALL
+        FROM(
+        SELECT
+        A.EQP_G,SUM(A.A3_PRODUCT_MOVE-A.A3_SELF_MOVE)/MAX(B.WEEK_DAY) BACKUP_A3_MOVE
+        FROM A1_MFG.CRITICLE_N1A3_MOVE_INFO A
+        LEFT JOIN DATE_LIST B
+        ON 1=1
+        WHERE A.SHIFT_DATE BETWEEN B.START_DATE AND B.END_DATE
+        GROUP BY EQP_G
+        )WHERE BACKUP_A3_MOVE &gt; 0
+        ))
+    </select>
+
+   <select id="getA3SelfMoveRatioTarget" resultType="map">
+       SELECT
+       FUNCTION_NAME, KEY1 EQP_G,TO_NUMBER(KEY2) TARGET
+       FROM A1_MFG.CRITICLE_COMMENT_SUMMARY
+       WHERE FUNCTION_NAME = 'A3MoveSelfRatioTarget'
+   </select>
+
+    <select id="getA3SelfMoveRatioAlarmSetting" resultType="map">
+        SELECT
+        FUNCTION_NAME, TO_NUMBER(KEY1) MOVE,TO_NUMBER(KEY2) GAP
+        FROM A1_MFG.CRITICLE_COMMENT_SUMMARY
+        WHERE FUNCTION_NAME = 'A3_MOVE_EQPG_ALARM'
+    </select>
+
+    <update id="updateA3SelfMoveRatioAlarmSetting">
+        UPDATE A1_MFG.CRITICLE_COMMENT_SUMMARY
+        SET KEY1 = #{move,jdbcType=VARCHAR},KEY2 = #{gap,jdbcType=VARCHAR}
+        ,UPDATE_USER = #{updateUser,jdbcType=VARCHAR},UPDATE_TIME = SYSDATE
+        WHERE FUNCTION_NAME = 'A3_MOVE_EQPG_ALARM'
+    </update>
+
+    <update id="updateA3SelfMoveRatioTarget">
+        UPDATE A1_MFG.CRITICLE_COMMENT_SUMMARY
+        SET KEY2 = #{TARGET,jdbcType=VARCHAR}
+        ,UPDATE_USER = #{updateUser,jdbcType=VARCHAR},UPDATE_TIME = SYSDATE
+        WHERE FUNCTION_NAME = 'A3MoveSelfRatioTarget' AND KEY1 = #{EQP_G,jdbcType=VARCHAR}
+    </update>
+
+    <insert id="insertA3SelfMoveRatioTarget">
+        INSERT INTO A1_MFG.CRITICLE_COMMENT_SUMMARY(FUNCTION_NAME,KEY1,KEY2,UPDATE_USER,UPDATE_TIME)
+        VALUES('A3MoveSelfRatioTarget',#{EQP_G,jdbcType=VARCHAR},#{TARGET,jdbcType=VARCHAR},#{UPDATE_USER,jdbcType=VARCHAR},SYSDATE)
+    </insert>
+
+    <delete id="deleteA3SelfMoveRatioTarget">
+        DELETE FROM A1_MFG.CRITICLE_COMMENT_SUMMARY
+        WHERE FUNCTION_NAME = 'A3MoveSelfRatioTarget'
+    </delete>
+
+    <insert id="insertA3SelfMoveRatioTargetList">
+        insert all
+        <foreach collection="list" item="item">
+            into A1_MFG.CRITICLE_COMMENT_SUMMARY(FUNCTION_NAME,KEY1,KEY2,UPDATE_USER,UPDATE_TIME)
+            values('A3MoveSelfRatioTarget',#{item.eqpg,jdbcType=VARCHAR},#{item.target,jdbcType=VARCHAR},#{username,jdbcType=VARCHAR},SYSDATE)
+        </foreach>
+        select 1 from dual
+    </insert>
+
+</mapper>

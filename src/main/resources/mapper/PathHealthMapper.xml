@@ -1,0 +1,627 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.PathHealthMapper">
+
+    <select id="getEqpA12" resultType="java.util.Map">
+        SELECT EQP_G, EQP_ID, COMMON_ID, LISTAGG(CHAMBER,'|') WITHIN GROUP (ORDER BY CHAMBER) CHAMBER,MAX(PREV_E10_STATE_CODE)||' '||MAX(PREV_STATE) PREV_STATE FROM
+        (SELECT  A.EQP_G, A.EQP_ID, A.CHAMBER_ID, NVL(B.COMMON_ID, A.CHAMBER_ID) COMMON_ID, SUBSTR(A.CHAMBER_ID, INSTR(A.CHAMBER_ID, '.') + 1) CHAMBER
+        ,A.PREV_STATE,A.PREV_E10_STATE_CODE
+        FROM
+        (SELECT T.EQP_G, SUBSTR(T.EQP_ID, 1, 5) EQP_ID, T.EQP_ID CHAMBER_ID, T.PREV_E10_STATE_CODE,T.PREV_STATE, T.FAB_ID FROM PWEB.EQP_ID_USE_STD T
+        WHERE T.MIN_UNIT_FLAG = 'Y' AND MODULE=#{module} AND T.EQP_G=#{eqpg}
+
+        <if test="module != 'TF'">
+        AND T.ACTIVE_FLAG = 'Y'
+        </if>
+
+        )A,(SELECT LINE, KEY1 AS MODULE, KEY2 AS EQP_G, KEY3 AS EQP_ID, KEY4 AS CHAMBER_ID, KEY5 AS COMMON_ID, F_COMMENT AS TWINS_CHAMBER,UPDATE_TIME, UPDATE_USER
+        FROM PWEB.FUNCTION_SETTING T WHERE FUNCTION_NAME = 'Abnormal_System' AND FUNCTION_KEY = 'TwinsChamber' AND LINE = 'N11')B
+        WHERE A.CHAMBER_ID=B.CHAMBER_ID(+)) GROUP BY EQP_G,EQP_ID,COMMON_ID ORDER BY COMMON_ID
+    </select>
+
+    <select id="getEqpA3" resultType="java.util.Map">
+        SELECT EQP_G, EQP_ID, COMMON_ID, LISTAGG(CHAMBER,'|') WITHIN GROUP (ORDER BY CHAMBER) CHAMBER,MAX(PREV_E10_STATE_CODE)||' '||MAX(PREV_STATE) PREV_STATE FROM
+        (SELECT  A.EQP_G, A.EQP_ID, A.CHAMBER_ID, NVL(B.COMMON_ID, A.CHAMBER_ID) COMMON_ID, SUBSTR(A.CHAMBER_ID, INSTR(A.CHAMBER_ID, '.') + 1) CHAMBER
+        ,A.PREV_STATE,A.PREV_E10_STATE_CODE
+        FROM
+        (SELECT T.EQP_G, SUBSTR(T.EQP_ID, 1, 6) EQP_ID, T.EQP_ID CHAMBER_ID, T.PREV_E10_STATE_CODE,T.PREV_STATE, T.FAB_ID FROM PWEB.EQP_ID_USE_STD T
+        WHERE T.MIN_UNIT_FLAG = 'Y' AND MODULE=#{module} AND T.EQP_G=#{eqpg}
+
+        <if test="module != 'TF'">
+        AND T.ACTIVE_FLAG = 'Y'
+        </if>
+
+        )A,(SELECT LINE, KEY1 AS MODULE, KEY2 AS EQP_G, KEY3 AS EQP_ID, KEY4 AS CHAMBER_ID, KEY5 AS COMMON_ID, F_COMMENT AS TWINS_CHAMBER,UPDATE_TIME, UPDATE_USER
+        FROM PWEB.FUNCTION_SETTING T WHERE FUNCTION_NAME = 'Abnormal_System' AND FUNCTION_KEY = 'TwinsChamber' AND LINE = 'N11')B
+        WHERE A.CHAMBER_ID=B.CHAMBER_ID(+)) GROUP BY EQP_G,EQP_ID,COMMON_ID ORDER BY COMMON_ID
+    </select>
+
+    <select id="getEqpgA12" resultType="java.util.Map">
+        SELECT * FROM (SELECT DISTINCT EQP_G TEXT,EQP_G VAL FROM PWEB.EQP_ID_USE_STD T WHERE T.MODULE=#{module}) ORDER BY TEXT
+    </select>
+
+    <select id="getEqpgA3" resultType="java.util.Map">
+        SELECT * FROM (SELECT DISTINCT EQP_G TEXT,EQP_G VAL FROM PWEB.EQP_ID_USE_STD T WHERE T.MODULE=#{module}) ORDER BY TEXT
+    </select>
+
+    <select id="getTech" resultType="java.util.Map">
+        SELECT * FROM
+        (
+        SELECT 'ALL' TEXT,'ALL' VAL FROM DUAL
+        UNION ALL
+        SELECT DISTINCT TECH TEXT,TECH VAL FROM A3MFGYW1.PRODG_INFO
+        ) ORDER BY TEXT
+    </select>
+
+    <select id="getEqpProdg" resultType="java.util.Map">
+        <if test="module == 'ETCH'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL FROM DUAL
+            UNION ALL
+            SELECT DISTINCT PRODG1 TEXT,PRODG1 VAL FROM A1_MFG.ETCH_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+            ) ORDER BY TEXT
+        </if>
+        <if test="module == 'PHOTO'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL FROM DUAL
+            UNION ALL
+            SELECT DISTINCT PRODG1 TEXT,PRODG1 VAL FROM A1_MFG.PHOTO_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+            ) ORDER BY TEXT
+        </if>
+        <if test="module == 'CMP'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL FROM DUAL
+            UNION ALL
+            SELECT DISTINCT PRODG1 TEXT,PRODG1 VAL FROM A1_MFG.CMP_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+            ) ORDER BY TEXT
+        </if>
+        <if test="module == 'WET'">
+        SELECT * FROM
+        (
+        SELECT 'ALL' TEXT,'ALL' VAL FROM DUAL
+        UNION ALL
+        SELECT DISTINCT PRODG1 TEXT,PRODG1 VAL FROM A1_MFG.WET_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+        ) ORDER BY TEXT
+        </if>
+        <if test="module == 'TF'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL FROM DUAL
+            UNION ALL
+            SELECT DISTINCT PRODG1 TEXT,PRODG1 VAL FROM A1_MFG.TF_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+            ) ORDER BY TEXT
+        </if>
+        <if test="module == 'DIFF'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL FROM DUAL
+            UNION ALL
+            SELECT DISTINCT PRODG1 TEXT,PRODG1 VAL FROM A1_MFG.DIFF_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+            ) ORDER BY TEXT
+        </if>
+        <if test="module == 'Measurement'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL FROM DUAL
+            UNION ALL
+            SELECT DISTINCT PRODG1 TEXT,PRODG1 VAL FROM A1_MFG.MIT_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+            ) ORDER BY TEXT
+        </if>
+
+    </select>
+
+    <select id="getSuffix" resultType="java.util.Map">
+        <if test="module == 'ETCH'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL,1 NO FROM DUAL
+            UNION ALL
+            SELECT DISTINCT PRODSPEC_ID TEXT,PRODSPEC_ID VAL,2 NO FROM A1_MFG.ETCH_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+            AND (
+            <foreach collection="prodg.split(',')" item="item" separator="OR">
+                PRODG1 LIKE '%' || #{item} || '%'
+            </foreach>
+            )
+            ) ORDER BY NO,TEXT
+        </if>
+        <if test="module == 'PHOTO'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL,1 NO FROM DUAL
+            UNION ALL
+            SELECT DISTINCT PRODSPEC_ID TEXT,PRODSPEC_ID VAL,2 NO FROM A1_MFG.PHOTO_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+            AND (
+            <foreach collection="prodg.split(',')" item="item" separator="OR">
+                PRODG1 LIKE '%' || #{item} || '%'
+            </foreach>
+            )
+            ) ORDER BY NO,TEXT
+        </if>
+        <if test="module == 'CMP'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL,1 NO FROM DUAL
+            UNION ALL
+            SELECT DISTINCT PRODSPEC_ID TEXT,PRODSPEC_ID VAL,2 NO FROM A1_MFG.CMP_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+            AND (
+            <foreach collection="prodg.split(',')" item="item" separator="OR">
+                PRODG1 LIKE '%' || #{item} || '%'
+            </foreach>
+            )
+            ) ORDER BY NO,TEXT
+        </if>
+        <if test="module == 'WET'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL,1 NO FROM DUAL
+            UNION ALL
+            SELECT DISTINCT PRODSPEC_ID TEXT,PRODSPEC_ID VAL,2 NO FROM A1_MFG.WET_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+            AND (
+            <foreach collection="prodg.split(',')" item="item" separator="OR">
+                PRODG1 LIKE '%' || #{item} || '%'
+            </foreach>
+            )
+            ) ORDER BY NO,TEXT
+        </if>
+        <if test="module == 'TF'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL,1 NO FROM DUAL
+            UNION ALL
+            SELECT DISTINCT PRODSPEC_ID TEXT,PRODSPEC_ID VAL,2 NO FROM A1_MFG.TF_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+            AND (
+            <foreach collection="prodg.split(',')" item="item" separator="OR">
+                PRODG1 LIKE '%' || #{item} || '%'
+            </foreach>
+            )
+            ) ORDER BY NO,TEXT
+        </if>
+        <if test="module == 'DIFF'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL,1 NO FROM DUAL
+            UNION ALL
+            SELECT DISTINCT PRODSPEC_ID TEXT,PRODSPEC_ID VAL,2 NO FROM A1_MFG.DIFF_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+            AND (
+            <foreach collection="prodg.split(',')" item="item" separator="OR">
+                PRODG1 LIKE '%' || #{item} || '%'
+            </foreach>
+            )
+            ) ORDER BY NO,TEXT
+        </if>
+        <if test="module == 'Measurement'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL,1 NO FROM DUAL
+            UNION ALL
+            SELECT DISTINCT PRODSPEC_ID TEXT,PRODSPEC_ID VAL,2 NO FROM A1_MFG.MIT_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+            AND (
+            <foreach collection="prodg.split(',')" item="item" separator="OR">
+                PRODG1 LIKE '%' || #{item} || '%'
+            </foreach>
+            )
+            ) ORDER BY NO,TEXT
+        </if>
+
+    </select>
+
+
+    <select id="getOpeno" resultType="java.util.Map">
+        <if test="module == 'ETCH'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL,1 NO FROM DUAL
+            UNION ALL
+            SELECT DISTINCT OPE_NO TEXT,OPE_NO VAL,2 NO FROM A1_MFG.ETCH_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+            <if test="prodg != null and prodg != '' and prodg != 'ALL'">
+                AND (
+                <foreach collection="prodg.split(',')" item="item" separator="OR">
+                    PRODG1 LIKE '%' || #{item} || '%'
+                </foreach>
+                )
+            </if>
+
+            <if test="prodgspecid != null and prodgspecid != '' and prodgspecid != 'ALL'">
+                AND (
+                <foreach collection="prodgspecid.split(',')" item="item" separator="OR">
+                    PRODSPEC_ID LIKE '%' || #{item} || '%'
+                </foreach>
+                )
+            </if>
+            ) ORDER BY NO,TEXT
+        </if>
+        <if test="module == 'PHOTO'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL,1 NO FROM DUAL
+            UNION ALL
+            SELECT DISTINCT OPE_NO TEXT,OPE_NO VAL,2 NO FROM A1_MFG.PHOTO_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+
+            <if test="prodg != null and prodg != '' and prodg != 'ALL'">
+                AND (
+                <foreach collection="prodg.split(',')" item="item" separator="OR">
+                    PRODG1 LIKE '%' || #{item} || '%'
+                </foreach>
+                )
+            </if>
+
+            <if test="prodgspecid != null and prodgspecid != '' and prodgspecid != 'ALL'">
+                AND (
+                <foreach collection="prodgspecid.split(',')" item="item" separator="OR">
+                    PRODSPEC_ID LIKE '%' || #{item} || '%'
+                </foreach>
+                )
+            </if>
+
+
+            ) ORDER BY NO,TEXT
+        </if>
+        <if test="module == 'CMP'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL,1 NO FROM DUAL
+            UNION ALL
+            SELECT DISTINCT OPE_NO TEXT,OPE_NO VAL,2 NO FROM A1_MFG.CMP_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+
+
+            <if test="prodg != null and prodg != '' and prodg != 'ALL'">
+                AND (
+                <foreach collection="prodg.split(',')" item="item" separator="OR">
+                    PRODG1 LIKE '%' || #{item} || '%'
+                </foreach>
+                )
+            </if>
+
+            <if test="prodgspecid != null and prodgspecid != '' and prodgspecid != 'ALL'">
+                AND (
+                <foreach collection="prodgspecid.split(',')" item="item" separator="OR">
+                    PRODSPEC_ID LIKE '%' || #{item} || '%'
+                </foreach>
+                )
+            </if>
+
+            ) ORDER BY NO,TEXT
+        </if>
+        <if test="module == 'WET'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL,1 NO FROM DUAL
+            UNION ALL
+            SELECT DISTINCT OPE_NO TEXT,OPE_NO VAL,2 NO FROM A1_MFG.WET_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+
+            <if test="prodg != null and prodg != '' and prodg != 'ALL'">
+                AND (
+                <foreach collection="prodg.split(',')" item="item" separator="OR">
+                    PRODG1 LIKE '%' || #{item} || '%'
+                </foreach>
+                )
+            </if>
+
+            <if test="prodgspecid != null and prodgspecid != '' and prodgspecid != 'ALL'">
+                AND (
+                <foreach collection="prodgspecid.split(',')" item="item" separator="OR">
+                    PRODSPEC_ID LIKE '%' || #{item} || '%'
+                </foreach>
+                )
+            </if>
+
+
+            ) ORDER BY NO,TEXT
+        </if>
+        <if test="module == 'TF'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL,1 NO FROM DUAL
+            UNION ALL
+            SELECT DISTINCT OPE_NO TEXT,OPE_NO VAL,2 NO FROM A1_MFG.TF_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+
+            <if test="prodg != null and prodg != '' and prodg != 'ALL'">
+                AND (
+                <foreach collection="prodg.split(',')" item="item" separator="OR">
+                    PRODG1 LIKE '%' || #{item} || '%'
+                </foreach>
+                )
+            </if>
+
+            <if test="prodgspecid != null and prodgspecid != '' and prodgspecid != 'ALL'">
+                AND (
+                <foreach collection="prodgspecid.split(',')" item="item" separator="OR">
+                    PRODSPEC_ID LIKE '%' || #{item} || '%'
+                </foreach>
+                )
+            </if>
+
+
+            ) ORDER BY NO,TEXT
+        </if>
+        <if test="module == 'DIFF'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL,1 NO FROM DUAL
+            UNION ALL
+            SELECT DISTINCT OPE_NO TEXT,OPE_NO VAL,2 NO FROM A1_MFG.DIFF_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+
+            <if test="prodg != null and prodg != '' and prodg != 'ALL'">
+                AND (
+                <foreach collection="prodg.split(',')" item="item" separator="OR">
+                    PRODG1 LIKE '%' || #{item} || '%'
+                </foreach>
+                )
+            </if>
+
+            <if test="prodgspecid != null and prodgspecid != '' and prodgspecid != 'ALL'">
+                AND (
+                <foreach collection="prodgspecid.split(',')" item="item" separator="OR">
+                    PRODSPEC_ID LIKE '%' || #{item} || '%'
+                </foreach>
+                )
+            </if>
+
+            ) ORDER BY NO,TEXT
+        </if>
+        <if test="module == 'Measurement'">
+            SELECT * FROM
+            (
+            SELECT 'ALL' TEXT,'ALL' VAL,1 NO FROM DUAL
+            UNION ALL
+            SELECT DISTINCT OPE_NO TEXT,OPE_NO VAL,2 NO FROM A1_MFG.MIT_CLOSE_PATH_DETAIL_COMM WHERE EQP_G=#{eqpg}
+            AND FAB=#{fab}
+
+            <if test="prodg != null and prodg != '' and prodg != 'ALL'">
+                AND (
+                <foreach collection="prodg.split(',')" item="item" separator="OR">
+                    PRODG1 LIKE '%' || #{item} || '%'
+                </foreach>
+                )
+            </if>
+
+            <if test="prodgspecid != null and prodgspecid != '' and prodgspecid != 'ALL'">
+                AND (
+                <foreach collection="prodgspecid.split(',')" item="item" separator="OR">
+                    PRODSPEC_ID LIKE '%' || #{item} || '%'
+                </foreach>
+                )
+            </if>
+
+
+            ) ORDER BY NO,TEXT
+        </if>
+
+    </select>
+
+
+
+    <select id="getPathDetail" resultType="java.util.Map">
+        SELECT * FROM (
+        SELECT
+        NULL EQP_G,
+        NULL MNPD_ID,
+        NULL PRODG1,
+        NULL PRODSPEC_ID,
+        NULL OPER_NO,
+        NULL WIP_DTH,
+        NULL WIP_CLOSE_1D,
+        NULL WIP_CLOSE_3D,
+        NULL WIP_CLOSE_7D,
+        NULL WIP_CLOSE_14D,
+        NULL INPUT_30D,
+        NULL MODULE_OWNER,
+        NULL GROUP_TECH
+
+        <!-- 2. 循环拼接 CASE 计算列 【对应C#第一个for循环】 -->
+        <foreach collection="array" item="eqp" separator=" ">
+            ,CASE
+            WHEN COUNT(CASE WHEN WIP_CLOSE_7D > 100 THEN OPER_NO ELSE NULL END) = 0
+            THEN TO_CHAR(0)
+            ELSE ROUND(
+            (
+
+
+
+            COUNT(CASE WHEN (("${eqp}"='OK') OR ("${eqp}" LIKE 'MFG%' AND "${eqp}" NOT LIKE '%RMS%' AND "${eqp}" NOT LIKE '%RDS%' AND "${eqp}" NOT LIKE '%APC%')) AND WIP_CLOSE_7D > 100 THEN OPER_NO ELSE NULL END)
+
+
+            / COUNT(CASE WHEN WIP_CLOSE_7D > 100 THEN OPER_NO ELSE NULL END)) * 100, 1
+            ) || '%'
+            END "${eqp}"
+        </foreach>
+
+        ,NULL CNT,
+        NULL RCP_IDENT
+        FROM (
+        SELECT A.*, 0 CNT
+        FROM (
+        SELECT *
+        FROM (
+        SELECT
+        EQP_G,
+        FLOW_ID MNPD_ID,
+        PRODG1,
+        PRODSPEC_ID,
+        OPE_NO OPER_NO,
+        D1 WIP_DTH,
+        D1 WIP_CLOSE_1D,
+        D3 WIP_CLOSE_3D,
+        D7 WIP_CLOSE_7D,
+        D14 WIP_CLOSE_14D,
+        INPUT_30D,
+        COMMON_ID,
+        COMM
+        FROM ${tb}
+        WHERE EQP_G = '${eqpg}'
+        AND FAB = '${fab}'
+
+
+        <if test="prodg != null and prodg != '' and prodg != 'ALL'">
+            AND (
+            <foreach collection="prodg.split(',')" item="item" separator="OR">
+                PRODG1 LIKE '%' || #{item} || '%'
+            </foreach>
+            )
+        </if>
+
+
+
+
+        <if test="prodgspecid != null and prodgspecid != '' and prodgspecid != 'ALL'">
+            AND (
+            <foreach collection="prodgspecid.split(',')" item="item" separator="OR">
+                PRODSPEC_ID LIKE '%' || #{item} || '%'
+            </foreach>
+            )
+        </if>
+
+
+        <if test="openo != null and openo != '' and openo != 'ALL'">
+            AND (
+            <foreach collection="openo.split(',')" item="item" separator="OR">
+                OPE_NO LIKE '%' || #{item} || '%'
+            </foreach>
+            )
+        </if>
+
+        <if test="recipe != null and recipe!=''">
+            AND RCP_IDENT LIKE '%${recipe}%'
+        </if>
+
+        <if test="tech != null and tech != '' and tech != 'ALL'">
+            AND GROUP_TECH='${tech}'
+        </if>
+
+
+        )
+        PIVOT (
+        MAX(COMM) FOR COMMON_ID IN
+        (
+        <!-- 3. 第一次PIVOT列循环 【C#第二个for循环】 -->
+        <foreach collection="array" item="eqp" separator=",">
+            '${eqp}' "${eqp}"
+        </foreach>
+        )
+        )
+        ) A
+        )
+         UNION ALL
+
+        SELECT
+        AA.*,
+        CC.RCP_IDENT
+        FROM (
+        SELECT A.*, 0 CNT
+        FROM (
+        SELECT *
+        FROM (
+        SELECT
+        EQP_G,
+        FLOW_ID MNPD_ID,
+        PRODG1,
+        PRODSPEC_ID,
+        OPE_NO OPER_NO,
+        D1 WIP_DTH,
+        D1 WIP_CLOSE_1D,
+        D3 WIP_CLOSE_3D,
+        D7 WIP_CLOSE_7D,
+        D14 WIP_CLOSE_14D,
+        INPUT_30D,
+        COMMON_ID,
+        COMM,MODULE_OWNER,GROUP_TECH
+        FROM ${tb}
+        WHERE EQP_G = '${eqpg}'
+        AND FAB = '${fab}'
+
+
+        <if test="prodg != null and prodg != '' and prodg != 'ALL'">
+            AND (
+            <foreach collection="prodg.split(',')" item="item" separator="OR">
+                PRODG1 LIKE '%' || #{item} || '%'
+            </foreach>
+            )
+        </if>
+
+        <if test="prodgspecid != null and prodgspecid != '' and prodgspecid != 'ALL'">
+            AND (
+            <foreach collection="prodgspecid.split(',')" item="item" separator="OR">
+                PRODSPEC_ID LIKE '%' || #{item} || '%'
+            </foreach>
+            )
+        </if>
+
+        <if test="openo != null and openo != '' and openo != 'ALL'">
+            AND (
+            <foreach collection="openo.split(',')" item="item" separator="OR">
+                OPE_NO LIKE '%' || #{item} || '%'
+            </foreach>
+            )
+        </if>
+
+        <if test="recipe != null and recipe!=''">
+            AND RCP_IDENT LIKE '%${recipe}%'
+        </if>
+
+        <if test="tech != null and tech != '' and tech != 'ALL'">
+            AND GROUP_TECH='${tech}'
+        </if>
+
+        )
+        PIVOT (
+        MAX(COMM) FOR COMMON_ID IN
+        (
+        <!-- 4. 第二次PIVOT列循环 【C#第三个for循环】 -->
+        <foreach collection="array" item="eqp" separator=",">
+            '${eqp}' "${eqp}"
+        </foreach>
+        )
+        )
+        ) A
+        ) AA
+
+        <!-- 关联子查询 -->
+        ,(
+        SELECT *
+        FROM (
+        SELECT T.*,
+        ROW_NUMBER() OVER(PARTITION BY T.EQP_G,T.FLOW_ID,T.PRODG1,T.PRODSPEC_ID,T.OPE_NO ORDER BY LENGTH(RCP_IDENT)) RN
+        FROM ${tb} T
+        WHERE EQP_G = '${eqpg}'
+        AND FAB = '${fab}'
+        )
+        WHERE RN = 1
+        ) CC
+
+        <!-- Oracle 左连接 (+) 条件 -->
+        WHERE AA.EQP_G = CC.EQP_G(+)
+        AND AA.MNPD_ID = CC.FLOW_ID(+)
+        AND AA.PRODG1 = CC.PRODG1(+)
+        AND AA.PRODSPEC_ID = CC.PRODSPEC_ID(+)
+        AND AA.OPER_NO = CC.OPE_NO(+)
+
+        <!-- 最后排序 -->
+        ) ORDER BY NVL(WIP_CLOSE_7D, 9999999999999) DESC
+    </select>
+
+
+
+</mapper>

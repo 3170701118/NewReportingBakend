@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.CommonMapper">
+
+    <!-- 插入 点击率数据 -->
+    <insert id="insertClickRateDetails">
+      INSERT INTO A1_MFG.SYS_CLICK_DATE(SHIFT_DATE,ROUTE_NAME,FUNCTION_ID,CNAME,FUNCTION_TYPE,LINK,UPDATE_TIME)
+      VALUES(TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD'),#{routeName},#{functionId},#{cname},#{functionType,jdbcType=VARCHAR},#{link,jdbcType=VARCHAR},SYSDATE)
+    </insert>
+
+    <insert id="insertClickRateLogList" parameterType="java.util.List">
+        INSERT INTO
+        A1_MFG.SYS_CLICK_DATE(SHIFT_DATE,ROUTE_NAME,FUNCTION_ID,CNAME,FUNCTION_TYPE,LINK,UPDATE_TIME)
+        <foreach collection="list" item="item" separator="union all" open="(" close=")" >
+            SELECT
+            <trim suffixOverrides=",">
+                <choose>
+                    <when test="item.updateTime != null and item.updateTime !=''">
+                        TO_CHAR(TO_DATE(#{item.updateTime,javaType=String,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS')-7.5/24,'YYYYMMDD'),
+                    </when>
+                    <otherwise>
+                        TO_CHAR(SYSDATE-7.5/24,'YYYYMMDD'),
+                    </otherwise>
+                </choose>
+                <choose>
+                    <when test="item.routeName != null and item.routeName !=''">
+                        #{item.routeName,javaType=String,jdbcType=VARCHAR},
+                    </when>
+                    <otherwise>
+                       NULL,
+                    </otherwise>
+                </choose>
+                <choose>
+                    <when test="item.functionId != null and item.functionId !=''">
+                        #{item.functionId,javaType=String,jdbcType=VARCHAR},
+                    </when>
+                    <otherwise>
+                        NULL,
+                    </otherwise>
+                </choose>
+                <choose>
+                    <when test="item.cname != null and item.cname !=''">
+                        #{item.cname,javaType=String,jdbcType=VARCHAR},
+                    </when>
+                    <otherwise>
+                        NULL,
+                    </otherwise>
+                </choose>
+                <choose>
+                    <when test="item.functionType != null and item.functionType !=''">
+                        #{item.functionType,javaType=String,jdbcType=VARCHAR},
+                    </when>
+                    <otherwise>
+                        NULL,
+                    </otherwise>
+                </choose>
+                <choose>
+                    <when test="item.link != null and item.link !=''">
+                        #{item.link,javaType=String,jdbcType=VARCHAR},
+                    </when>
+                    <otherwise>
+                        NULL,
+                    </otherwise>
+                </choose>
+                <choose>
+                    <when test="item.updateTime != null and item.updateTime !=''">
+                        TO_DATE(#{item.updateTime,javaType=String,jdbcType=VARCHAR},'YYYY-MM-DD HH24:MI:SS'),
+                    </when>
+                    <otherwise>
+                        NULL,
+                    </otherwise>
+                </choose>
+            </trim>
+            FROM DUAL
+        </foreach>
+    </insert>
+<!-- 文件管理的增删改查 -->
+    <insert id="insertFileManagerDetails" >
+      INSERT INTO A1MFG.SYS_FILE_MANAGE
+        (ROUTE_NAME,FUNCTION_ID,FILE_NAME,FUNCTION_TYPE,FILE_PATH,REMARK,CREATE_TIME,CREATE_USER,UPDATE_TIME,UPDATE_USER)
+      VALUES( #{routeName},#{functionId},#{fileName},#{functionType,jdbcType=VARCHAR},#{filePath},#{remark,jdbcType=VARCHAR},SYSDATE,#{createUser},SYSDATE,#{createUser})
+    </insert>
+
+    <select id = 'getFileListTableByFunctionId' resultType="mfg.reporting.pojo.FileManage">
+        SELECT ROUTE_NAME,FUNCTION_ID,FILE_NAME,FUNCTION_TYPE,FILE_PATH
+        ,REMARK,TO_CHAR(CREATE_TIME,'YYYYMMDD')CREATE_TIME,CREATE_USER,TO_CHAR(UPDATE_TIME,'YYYYMMDD')UPDATE_TIME,UPDATE_USER
+         FROM A1MFG.SYS_FILE_MANAGE WHERE FUNCTION_ID = #{functionId}
+    </select>
+
+    <update id="updateFileManagerDetails">
+      UPDATE A1MFG.SYS_FILE_MANAGE SET UPDATE_TIME = SYSDATE, UPDATE_USER = #{updateUser}
+      <if test="remark!= null and remark!= ''">
+        ,REMARK = #{remark}
+        </if>
+      WHERE FUNCTION_ID = #{functionId} AND FILE_NAME = #{fileName}
+    </update>
+
+    <delete id="deleteFileManagerDetails">
+      DELETE FROM A1MFG.SYS_FILE_MANAGE WHERE FUNCTION_ID = #{functionId} AND FILE_NAME = #{fileName}
+    </delete>
+
+    <insert id="mergeFileManagerDetails" >
+      MERGE INTO A1MFG.SYS_FILE_MANAGE T
+      USING(
+        SELECT #{routeName} AS ROUTE_NAME,#{functionId} AS FUNCTION_ID, #{filePath} AS FILE_PATH
+        ,#{fileName,jdbcType=VARCHAR} AS FILE_NAME,#{functionType} AS FUNCTION_TYPE
+        ,#{remark} AS REMARK,#{createUser} AS CREATE_USER,SYSDATE AS CREATE_TIME,
+        SYSDATE AS UPDATE_TIME,#{updateUser} AS UPDATE_USER
+        FROM DUAL
+        ) S
+        ON (T.FUNCTION_ID = S.FUNCTION_ID)
+        WHEN MATCHED THEN
+        UPDATE SET T.UPDATE_TIME = SYSDATE,T.UPDATE_USER = S.UPDATE_USER
+        <if test="FILE_NAME != null and FILE_NAME != ''">
+          ,T.FILE_NAME = S.FILE_NAME
+        </if>
+        <if test="REMARK != null and REMARK != ''">
+          ,T.REMARK = S.REMARK
+        </if>
+        WHEN NOT MATCHED THEN
+        INSERT (ROUTE_NAME,FUNCTION_ID,FILE_NAME,FUNCTION_TYPE,FILE_PATH,REMARK,CREATE_TIME,CREATE_USER)
+        VALUES(S.ROUTE_NAME,S.FUNCTION_ID,S.FILE_NAME,S.FUNCTION_TYPE,S.FILE_PATH,S.REMARK,S.CREATE_TIME,S.CREATE_USER)
+    </insert>
+
+    <!-- 获取权限信息 -->
+
+    <select id="getPermissionInfo" resultType="mfg.reporting.pojo.MFGPermission">
+        SELECT 
+        FUNCTION_ID,CNAMES,SDEPT,DEPT,POWER,ACTIVE_FLAG,REMARK,UPDATE_TIME,UPDATE_USER 
+        FROM A1MFG.SYS_PERMISSION_MANAGE 
+        WHERE FUNCTION_ID = #{functionId}
+    </select>
+
+
+    <select id="getDownLoadTemplate" resultType="mfg.reporting.pojo.FileManage">
+        SELECT ROUTE_NAME,FUNCTION_ID,FILE_NAME,FUNCTION_TYPE,FILE_PATH,REMARK,CREATE_TIME,CREATE_USER,UPDATE_TIME,UPDATE_USER FROM A1MFG.SYS_FILE_MANAGE
+        WHERE FUNCTION_ID = #{functionId} AND FILE_NAME = #{fileName} AND FUNCTION_TYPE = 'Template'
+    </select>
+
+    <select id="getDownLoadManage" resultType="mfg.reporting.pojo.FileManage">
+        SELECT ROUTE_NAME,FUNCTION_ID,FILE_NAME,FUNCTION_TYPE,FILE_PATH,REMARK,CREATE_TIME,CREATE_USER,UPDATE_TIME,UPDATE_USER FROM A1MFG.SYS_FILE_MANAGE
+        WHERE FUNCTION_ID = #{functionId} AND FILE_NAME = #{fileName} AND FUNCTION_TYPE = 'Manage'
+    </select>
+
+    <select id="GetFunctionListByRouteName" resultType="mfg.reporting.pojo.FunctionList">
+        SELECT
+        MAX(MENU_ID)MENU_ID,FUNCTION_ID,MAX(REMARK)REMARK
+        ,MAX(TIPS)TIPS,MAX(TABLE_NAME)TABLE_NAME,MAX(ETL_NAME)ETL_NAME
+        ,MAX(UPDATE_TIME)UPDATE_TIME,MAX(UPDATE_USER)UPDATE_USER,MAX(DEVELOPER)DEVELOPER
+        ,LISTAGG(OWNER,'/')WITHIN GROUP(ORDER BY UPDATE_USER)OWNER
+        FROM(
+        SELECT
+        MENU_ID,C.FUNCTION_ID,C.REMARK,C.TIPS,C.TABLE_NAME,C.ETL_NAME,C.UPDATE_TIME,C.UPDATE_USER,C.DEVELOPER
+        ,D.CNAME ||'('||D.EMAIL||')' OWNER
+        FROM(
+        SELECT
+        A.MENU_ID,A.FUNCTION_ID,A.OWNER
+        ,A.REMARK,A.TIPS,A.TABLE_NAME,A.ETL_NAME,A.UPDATE_TIME,A.UPDATE_USER
+        ,B.CNAME ||'('||B.EXT||')' DEVELOPER
+        FROM(
+        SELECT
+        MENU_ID,FUNCTION_ID,OWNER,DEVELOPER,REMARK,TIPS,TABLE_NAME,ETL_NAME,UPDATE_TIME,UPDATE_USER
+        FROM A1MFG.SYS_FUNCTION_LIST
+        WHERE MENU_ID = #{menuId}
+        )A
+        LEFT JOIN WORKFLOW.HR_USERS B
+        ON A.DEVELOPER = B.EMAIL
+        )C LEFT JOIN WORKFLOW.HR_USERS D
+        ON 1=1
+        WHERE '/'||C.OWNER||'/' LIKE '%/'||D.EMAIL||'/%' AND D.EMAIL  IS NOT NULL
+        )GROUP BY FUNCTION_ID
+    </select>
+
+    <delete id="deleteFunctionItem">
+        DELETE FROM A1MFG.SYS_FUNCTION_LIST WHERE FUNCTION_ID = #{functionId}
+    </delete>
+    <select id="getFunctionListByFunctionId" resultType="mfg.reporting.pojo.FunctionList">
+        SELECT
+        FUNCTION_ID,MENU_ID,MAX(REMARK) REMARK,
+        MAX(TIPS)TIPS,MAX(TABLE_NAME)TABLE_NAME,MAX(ETL_NAME)ETL_NAME,MAX(DEVELOPER)DEVELOPER
+        ,LISTAGG(OWNER,' / ')WITHIN GROUP(ORDER BY 1)OWNER
+        FROM(
+        SELECT DISTINCT
+        A.MENU_ID,A.FUNCTION_ID,A.REMARK,A.TIPS,A.TABLE_NAME,A.ETL_NAME
+        ,CASE WHEN A.OWNER = 'A12_MFG' THEN 'A12_MFG' ELSE B.CNAME||'('||B.EMAIL||')' END OWNER
+        ,CASE WHEN A.DEVELOPER = '' THEN 'Reporting' ELSE C.CNAME||'('||C.EXT||')' END DEVELOPER
+        FROM(
+        SELECT
+        MENU_ID,FUNCTION_ID,DEVELOPER,REMARK,TIPS,TABLE_NAME,ETL_NAME
+        ,TRIM(REGEXP_SUBSTR(t.OWNER, '[^/]+', 1, levels.column_value)) AS OWNER
+        FROM(
+        SELECT
+        MENU_ID,FUNCTION_ID,OWNER,DEVELOPER,REMARK,TIPS,TABLE_NAME,ETL_NAME,UPDATE_TIME,UPDATE_USER
+        FROM A1MFG.SYS_FUNCTION_LIST
+        WHERE FUNCTION_ID = #{functionId}
+        )T,
+        TABLE(CAST(MULTISET(
+        SELECT LEVEL
+        FROM dual
+        CONNECT BY LEVEL &lt;= REGEXP_COUNT(t.OWNER, '/') + 1
+        ) AS sys.odcinumberlist)) levels
+        )A
+        LEFT JOIN WORKFLOW.HR_USERS B
+        ON A.OWNER = B.EMAIL
+        LEFT JOIN WORKFLOW.HR_USERS C
+        ON A.DEVELOPER = C.EMAIL
+        WHERE (B.BYWORK = '0' AND C.BYWORK = '0') OR A.OWNER ='A12_MFG'
+        )GROUP BY FUNCTION_ID,MENU_ID
+    </select>
+
+    <select id="getFunctionInfoDetailsByFunctionId" resultType="mfg.reporting.pojo.FunctionList">
+        SELECT
+        MENU_ID,FUNCTION_ID,OWNER,DEVELOPER,REMARK,TIPS,TABLE_NAME,ETL_NAME,UPDATE_TIME,UPDATE_USER
+        FROM A1MFG.SYS_FUNCTION_LIST
+        WHERE FUNCTION_ID = #{functionId}
+    </select>
+    <select id="searchFunctionList" resultType="mfg.reporting.pojo.FunctionList" parameterType="mfg.reporting.pojo.FunctionList">
+        SELECT
+        MAX(MENU_ID)MENU_ID,FUNCTION_ID,MAX(REMARK)REMARK
+        ,MAX(DEVELOPER)DEVELOPER
+        ,LISTAGG(OWNER,'/')WITHIN GROUP(ORDER BY 1)OWNER
+        ,MAX(MENU_NAME)MENU_NAME
+        FROM(
+        SELECT
+        E.MENU_ID,E.FUNCTION_ID,E.REMARK,E.MENU_NAME,E.DEVELOPER
+        ,CASE WHEN E.OWNER = 'A12_MFG' THEN 'A12_MFG' ELSE F.CNAME ||'('||F.EMAIL||')' END OWNER
+        FROM(
+        SELECT
+        C.MENU_ID,C.FUNCTION_ID,C.OWNER,C.REMARK,C.MENU_NAME
+        ,CASE WHEN D.CNAME IS NULL THEN 'Reporting' ELSE D.CNAME ||'('||D.EXT||')' END DEVELOPER
+        FROM(
+        SELECT
+        MENU_ID,FUNCTION_ID,OWNER,DEVELOPER,REMARK,MENU_NAME
+        FROM(
+        SELECT
+        A.MENU_ID,A.FUNCTION_ID,A.OWNER,A.DEVELOPER,A.REMARK
+        ,B.MENU_NAME
+        FROM A1MFG.SYS_FUNCTION_LIST A
+        LEFT JOIN A1MFG.SYS_MENU_LIST B
+        ON A.MENU_ID = B.ROUTE_NAME
+        )WHERE OWNER &lt;&gt; 'A12_MFG'
+        <if test="menuName!= null and menuName!= ''">
+            AND MENU_NAME LIKE  CONCAT('%',CONCAT(#{menuName},'%'))
+        </if>
+        <if test="menuId!= null and menuId!= ''">
+            AND MENU_ID = #{menuId}
+        </if>
+        <if test="functionId!= null and functionId!= ''">
+            AND FUNCTION_ID LIKE CONCAT('%',CONCAT(#{functionId},'%'))
+        </if>
+        <if test="owner!= null and owner!= ''">
+            AND OWNER LIKE CONCAT('%',CONCAT(#{owner},'%'))
+        </if>
+        <if test="developer!= null and developer!= ''">
+            AND DEVELOPER LIKE CONCAT('%',CONCAT(#{developer},'%'))
+        </if>
+        <if test="tableName!= null and tableName!= ''">
+            AND TABLE_NAME LIKE CONCAT('%',CONCAT(#{tableName},'%'))
+        </if>
+        <if test="etlName!= null and etlName!= ''">
+            AND ETL_NAME LIKE  CONCAT('%',CONCAT(#{etlName},'%'))
+        </if>
+        )C LEFT JOIN WORKFLOW.HR_USERS D
+        ON C.DEVELOPER = D.EMAIL
+        )E LEFT JOIN WORKFLOW.HR_USERS F
+        ON 1=1
+        WHERE ('/'||E.OWNER||'/' LIKE '%/'||F.EMAIL||'/%' AND F.EMAIL  IS NOT NULL)
+        )GROUP BY FUNCTION_ID
+        UNION ALL
+        SELECT
+        MENU_ID,FUNCTION_ID,REMARK,DEVELOPER,OWNER,MENU_NAME
+        FROM(
+        SELECT
+        A.MENU_ID,A.FUNCTION_ID,A.REMARK
+        ,CASE WHEN C.CNAME IS NULL THEN 'Reporting' ELSE C.CNAME ||'('||C.EXT||')' END DEVELOPER
+        ,A.OWNER,B.MENU_NAME
+        FROM A1MFG.SYS_FUNCTION_LIST A
+        LEFT JOIN A1MFG.SYS_MENU_LIST B
+        ON A.MENU_ID = B.ROUTE_NAME
+        LEFT JOIN WORKFLOW.HR_USERS C
+        ON A.DEVELOPER = C.EMAIL
+        WHERE A.OWNER = 'A12_MFG'
+        <if test="menuName!= null and menuName!= ''">
+            AND B.MENU_NAME LIKE  CONCAT('%',CONCAT(#{menuName},'%'))
+        </if>
+        <if test="menuId!= null and menuId!= ''">
+            AND A.MENU_ID = #{menuId}
+        </if>
+        <if test="functionId!= null and functionId!= ''">
+            AND A.FUNCTION_ID LIKE CONCAT('%',CONCAT(#{functionId},'%'))
+        </if>
+        <if test="owner!= null and owner!= ''">
+            AND A.OWNER LIKE CONCAT('%',CONCAT(#{owner},'%'))
+        </if>
+        <if test="developer!= null and developer!= ''">
+            AND A.DEVELOPER LIKE CONCAT('%',CONCAT(#{developer},'%'))
+        </if>
+        <if test="tableName!= null and tableName!= ''">
+            AND A.TABLE_NAME LIKE CONCAT('%',CONCAT(#{tableName},'%'))
+        </if>
+        <if test="etlName!= null and etlName!= ''">
+            AND A.ETL_NAME LIKE  CONCAT('%',CONCAT(#{etlName},'%'))
+        </if>
+        )
+    </select>
+
+    <select id="insertFunctionList" parameterType="mfg.reporting.pojo.FunctionList">
+        MERGE INTO A1MFG.SYS_FUNCTION_LIST T
+        USING (
+        SELECT #{menuId} MENU_ID,#{functionId} FUNCTION_ID,#{owner,jdbcType=VARCHAR}OWNER,
+        #{developer,jdbcType=VARCHAR}DEVELOPER,#{remark,jdbcType=VARCHAR}REMARK
+        ,#{tips ,jdbcType=VARCHAR}TIPS,#{tableName ,jdbcType=VARCHAR}TABLE_NAME
+        ,#{etlName ,jdbcType=VARCHAR}ETL_NAME,SYSDATE UPDATE_TIME,#{updateUser}UPDATE_USER FROM DUAL
+        )S
+        ON (T.FUNCTION_ID = S.FUNCTION_ID AND T.MENU_ID = S.MENU_ID)
+        WHEN MATCHED THEN
+       UPDATE SET T.UPDATE_TIME = S.UPDATE_TIME,T.UPDATE_USER = S.UPDATE_USER,
+        T.OWNER = S.OWNER ,T.DEVELOPER = S.DEVELOPER,T.REMARK = S.REMARK
+        ,T.TIPS = S.TIPS,T.TABLE_NAME = S.TABLE_NAME,T.ETL_NAME = S.ETL_NAME
+        WHEN NOT MATCHED THEN
+        INSERT (MENU_ID,FUNCTION_ID,OWNER,DEVELOPER,REMARK,TIPS,TABLE_NAME,ETL_NAME,UPDATE_TIME,UPDATE_USER)
+        VALUES(S.MENU_ID,S.FUNCTION_ID,S.OWNER,S.DEVELOPER,S.REMARK,S.TIPS,S.TABLE_NAME,S.ETL_NAME,S.UPDATE_TIME,S.UPDATE_USER)
+    </select>
+
+
+    <select id="getMenuInfoList" resultType="mfg.reporting.pojo.MenuInfo">
+        SELECT MENU_ID,PARENT_MENU_ID,ROUTE_NAME,MENU_NAME,MENU_TYPE,ADMIN_FLAG
+        ,PATH,RANK,REMARK,HIDE,STATUS,CREATE_TIME,CREATE_USER,UPDATE_TIME,UPDATE_USER
+        FROM A1MFG.SYS_MENU_LIST
+        WHERE  ( ADMIN_FLAG = 'N'
+        <if test="name!= null and name!= ''">
+            OR ADMIN_FLAG = DECODE(#{name},'admin','Y','N')
+        </if>
+        )
+        <if test="env == 'production'">
+            AND STATUS='prod'
+        </if>
+        <if test="env == 'test'">
+            AND (STATUS='prod' or STATUS = 'test')
+        </if>
+    </select>
+</mapper>

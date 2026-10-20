@@ -1,0 +1,5 @@
+#201测试环境
+server:
+  port: 8060
+  servlet:
+    context-path: /apitest

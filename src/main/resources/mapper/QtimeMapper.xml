@@ -1,0 +1,664 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="mfg.reporting.mapper.QtimeMapper">
+    <select id="getQtimeOverSummary" resultType="java.util.Map">
+            SELECT D.WEEK,D.A_OVER,D.B_OVER,D.C_OVER,D.D_OVER,D.ABCD_OVER,D.DAY_OVER_AVG,D.FCST_OVER_DAY
+            ,CASE WHEN D.WEEK LIKE 'Y%' THEN NULL ELSE D.DAY_OVER_ACC END DAY_OVER_ACC
+            ,D.TARGET_DAY_ACC
+            ,CASE WHEN (D.WEEK LIKE 'Y%' OR D.WEEK<![CDATA[<]]>TO_CHAR(SYSDATE-8/24-2/1440,'YYYYMMDD')) THEN NVL(D.ABCD_OVER,0)+NVL(D.FCST_OVER_DAY,0) ELSE NULL END TOTAL_OVER
+            FROM
+            (
+            SELECT A1.WEEK,A2.A_OVER,A2.B_OVER,A2.C_OVER,A2.D_OVER,A2.ABCD_OVER
+            ,NULL DAY_OVER_AVG,NULL FCST_OVER_DAY,NULL DAY_OVER_ACC,2100 TARGET_DAY_ACC
+            FROM
+            (
+            SELECT DISTINCT WEEK FROM (SELECT A.*,DENSE_RANK() OVER(ORDER BY A.WEEK DESC) RN FROM
+            (SELECT 'Y'||SUBSTR(SHOP_WEEK,3,2)||'W'||SUBSTR(SHOP_WEEK,5,2) WEEK,SHIFT_DATE FROM ODS.WP_CALENDAR WHERE SHIFT_HOUR='01' AND SHIFT_DATE <![CDATA[<=]]> TO_CHAR(SYSDATE-1-8/24-2/1440,'YYYYMMDD'))A
+            ) WHERE RN <![CDATA[<=]]> 5 AND RN>=2
+            )A1
+            ,(
+            SELECT B.WEEK
+            ,SUM(CASE WHEN A.QT_GRADE='A' THEN WAFER_QTY ELSE 0 END) A_OVER
+            ,SUM(CASE WHEN A.QT_GRADE='B' THEN WAFER_QTY ELSE 0 END) B_OVER
+            ,SUM(CASE WHEN A.QT_GRADE='C' THEN WAFER_QTY ELSE 0 END) C_OVER
+            ,SUM(CASE WHEN A.QT_GRADE='D' THEN WAFER_QTY ELSE 0 END) D_OVER
+            ,SUM(CASE WHEN A.QT_GRADE IN ('A','B','C','D') THEN WAFER_QTY ELSE 0 END) ABCD_OVER
+            FROM
+            (SELECT * FROM A1MFG.QTIME_OVER_DAILY
+            WHERE
+            SHIFT_DATE <![CDATA[<>]]>TO_CHAR(SYSDATE-8/24-2/1440,'YYYYMMDD')
+            <if test="nengflag == 'all'">
+                    AND NENG_FLAG LIKE '%'
+            </if>
+            <if test="nengflag != 'all'">
+                    AND NENG_FLAG=#{nengflag}
+            </if>
+
+            <if test="module == 'all'">
+                    AND (MODULE LIKE '%' OR MODULE IS NULL)
+            </if>
+            <if test="module == 'Measurement'">
+                    AND SUBSTR(CURRENT_OPE_NO,5,1)='Q'
+            </if>
+            <if test="module != 'all' and module != 'Measurement'">
+                    AND MODULE=#{module}
+            </if>
+
+            <if test="tech == 'all'">
+                    AND TECH LIKE '%'
+            </if>
+            <if test="tech != 'all'">
+                    AND TECH =#{tech}
+            </if>
+
+
+
+            AND CROSS_FLAG='N' AND QT_CONCERN='Y')A
+            ,(SELECT WEEK,SHIFT_DATE FROM (SELECT A.*,DENSE_RANK() OVER(ORDER BY A.WEEK DESC) RN FROM
+            (SELECT 'Y'||SUBSTR(SHOP_WEEK,3,2)||'W'||SUBSTR(SHOP_WEEK,5,2) WEEK,SHIFT_DATE FROM ODS.WP_CALENDAR WHERE SHIFT_HOUR='01' AND SHIFT_DATE <![CDATA[<=]]> TO_CHAR(SYSDATE-1-8/24-2/1440,'YYYYMMDD'))A
+            ) WHERE RN <![CDATA[<=]]> 5 AND RN>=2)B
+            WHERE A.SHIFT_DATE=B.SHIFT_DATE GROUP BY B.WEEK
+            )A2
+            WHERE A1.WEEK=A2.WEEK(+)
+
+
+
+            UNION ALL
+
+
+            SELECT
+            NVL(WEEK
+            ,(SELECT 'Y'||SUBSTR(SHOP_WEEK,3,2)||'W'||SUBSTR(SHOP_WEEK,5,2) WEEK FROM ODS.WP_CALENDAR WHERE SHIFT_HOUR='01' AND SHIFT_DATE = TO_CHAR(SYSDATE-1-8/24-2/1440,'YYYYMMDD')))
+            WEEK
+            ,SUM(A_OVER) A_OVER,SUM(B_OVER) B_OVER,SUM(C_OVER) C_OVER,SUM(D_OVER) D_OVER,SUM(ABCD_OVER) ABCD_OVER
+            ,AVG(DAY_OVER_AVG) DAY_OVER_AVG,SUM(FCST_OVER_DAY) FCST_OVER_DAY,MAX(DAY_OVER_ACC) DAY_OVER_ACC,MAX(TARGET_DAY_ACC) TARGET_DAY_ACC
+
+            FROM
+
+            (SELECT A4.*
+            ,CASE WHEN A4.WEEK NOT LIKE 'Y%' AND A4.ABCD_OVER IS NULL AND A4.WEEK>=TO_CHAR(SYSDATE-8/24-2/1440,'YYYYMMDD') THEN A4.DAY_OVER_AVG ELSE NULL END FCST_OVER_DAY
+            ,SUM(CASE WHEN A4.WEEK LIKE 'Y%' THEN NULL ELSE NVL(A4.ABCD_OVER,A4.DAY_OVER_AVG) END) OVER(ORDER BY REPLACE(A4.WEEK,'Y','1')) DAY_OVER_ACC
+            ,SUM(TARGET_DAY) OVER(ORDER BY REPLACE(A4.WEEK,'Y','1')) TARGET_DAY_ACC
+            FROM
+            (
+
+
+            SELECT A3.*
+            ,ROUND(AVG(CASE WHEN A3.WEEK LIKE 'Y%' THEN NULL ELSE A3.ABCD_OVER END) OVER()) DAY_OVER_AVG
+            ,ROUND(2100/7) TARGET_DAY
+            FROM
+            (
+
+
+            SELECT A1.SHIFT_DATE WEEK--,A2.A_OVER,A2.B_OVER,A2.C_OVER,A2.D_OVER,A2.ABCD_OVER
+            ,CASE WHEN A1.SHIFT_DATE<![CDATA[<]]>TO_CHAR(SYSDATE-8/24-2/1440,'YYYYMMDD') AND A2.A_OVER IS NULL THEN 0 ELSE A2.A_OVER END A_OVER
+            ,CASE WHEN A1.SHIFT_DATE<![CDATA[<]]>TO_CHAR(SYSDATE-8/24-2/1440,'YYYYMMDD') AND A2.B_OVER IS NULL THEN 0 ELSE A2.B_OVER END B_OVER
+            ,CASE WHEN A1.SHIFT_DATE<![CDATA[<]]>TO_CHAR(SYSDATE-8/24-2/1440,'YYYYMMDD') AND A2.C_OVER IS NULL THEN 0 ELSE A2.C_OVER END C_OVER
+            ,CASE WHEN A1.SHIFT_DATE<![CDATA[<]]>TO_CHAR(SYSDATE-8/24-2/1440,'YYYYMMDD') AND A2.D_OVER IS NULL THEN 0 ELSE A2.D_OVER END D_OVER
+            ,CASE WHEN A1.SHIFT_DATE<![CDATA[<]]>TO_CHAR(SYSDATE-8/24-2/1440,'YYYYMMDD') AND A2.ABCD_OVER IS NULL THEN 0 ELSE A2.ABCD_OVER END ABCD_OVER
+            FROM
+            (
+            SELECT C.WEEK,C.SHIFT_DATE FROM
+            (SELECT 'Y'||SUBSTR(SHOP_WEEK,3,2)||'W'||SUBSTR(SHOP_WEEK,5,2) WEEK ,SHIFT_DATE FROM ODS.WP_CALENDAR WHERE SHIFT_HOUR='01')C
+            ,(SELECT 'Y'||SUBSTR(SHOP_WEEK,3,2)||'W'||SUBSTR(SHOP_WEEK,5,2) WEEK,SHIFT_DATE FROM ODS.WP_CALENDAR WHERE SHIFT_HOUR='01' AND SHIFT_DATE=TO_CHAR(SYSDATE-1-8/24-2/1440,'YYYYMMDD'))D
+            WHERE C.WEEK=D.WEEK
+            )A1
+            ,(
+            SELECT A.SHIFT_DATE
+            ,SUM(CASE WHEN A.QT_GRADE='A' THEN WAFER_QTY ELSE 0 END) A_OVER
+            ,SUM(CASE WHEN A.QT_GRADE='B' THEN WAFER_QTY ELSE 0 END) B_OVER
+            ,SUM(CASE WHEN A.QT_GRADE='C' THEN WAFER_QTY ELSE 0 END) C_OVER
+            ,SUM(CASE WHEN A.QT_GRADE='D' THEN WAFER_QTY ELSE 0 END) D_OVER
+            ,SUM(CASE WHEN A.QT_GRADE IN ('A','B','C','D') THEN WAFER_QTY ELSE 0 END) ABCD_OVER
+            FROM
+            (SELECT * FROM A1MFG.QTIME_OVER_DAILY WHERE
+            SHIFT_DATE <![CDATA[<>]]>TO_CHAR(SYSDATE-8/24-2/1440,'YYYYMMDD')
+            <if test="nengflag == 'all'">
+                    AND NENG_FLAG LIKE '%'
+            </if>
+            <if test="nengflag != 'all'">
+                    AND NENG_FLAG=#{nengflag}
+            </if>
+
+            <if test="module == 'all'">
+                    AND (MODULE LIKE '%' OR MODULE IS NULL)
+            </if>
+            <if test="module == 'Measurement'">
+                    AND SUBSTR(CURRENT_OPE_NO,5,1)='Q'
+            </if>
+            <if test="module != 'all' and module != 'Measurement'">
+                    AND MODULE=#{module}
+            </if>
+
+            <if test="tech == 'all'">
+                    AND TECH LIKE '%'
+            </if>
+            <if test="tech != 'all'">
+                    AND TECH =#{tech}
+            </if>
+
+
+            AND CROSS_FLAG='N' AND QT_CONCERN='Y')A
+            ,(SELECT C.WEEK,C.SHIFT_DATE FROM
+            (SELECT 'Y'||SUBSTR(SHOP_WEEK,3,2)||'W'||SUBSTR(SHOP_WEEK,5,2) WEEK ,SHIFT_DATE FROM ODS.WP_CALENDAR WHERE SHIFT_HOUR='01')C
+            ,(SELECT 'Y'||SUBSTR(SHOP_WEEK,3,2)||'W'||SUBSTR(SHOP_WEEK,5,2) WEEK,SHIFT_DATE FROM ODS.WP_CALENDAR WHERE SHIFT_HOUR='01' AND SHIFT_DATE=TO_CHAR(SYSDATE-1-8/24-2/1440,'YYYYMMDD'))D
+            WHERE C.WEEK=D.WEEK)B
+            WHERE A.SHIFT_DATE=B.SHIFT_DATE GROUP BY A.SHIFT_DATE
+            )A2
+            WHERE A1.SHIFT_DATE=A2.SHIFT_DATE(+)
+
+
+
+            )A3
+
+
+
+            )A4) GROUP BY ROLLUP(WEEK))D
+            ORDER BY REPLACE(D.WEEK,'Y','1')
+    </select>
+
+    <select id="getQtimeOverDetail" resultType="mfg.reporting.pojo.QtimeOverDetailVO">
+            SELECT A.*,B.ACLASS FROM
+            (
+            SELECT WEEK,PRODG1,LOT_ID,OVER_TIME,SHIFT_DATE,WAFER_QTY,MODULE,CURRENT_OPE_NO OPE_NO
+            ,QT_GRADE GRADE,QTIME_SPEC SPEC,RESPONSE_MODULE,MAJOR_REASON,OVER_COMMENT
+            ,PLATFORM,PRODSPEC_ID,NENG_FLAG,TARGET_TIME,END_TIME,LOOP1,LOOP2,QT_CONCERN,SUB_LOT_TYPE
+            ,LOT_FAB,OVER_FAB,ACTION,REMARK,INSERT_TIME,CLAIM_TIME
+            ,CURRENT_MAINPD_ID,TECH,TARGET_MODULE,MFG_OVER,TRIGGER_OPE_NO,TARGET_OPE_NO,FLOW_KEY
+            FROM
+
+            (
+            SELECT A1.WEEK,A1.PRODG1,A1.LOT_ID,A1.OVER_TIME,A1.SHIFT_DATE,A1.WAFER_QTY,A1.MODULE,A1.CURRENT_OPE_NO
+            ,A1.QT_GRADE ,A1.QTIME_SPEC ,NVL(A1.RESPONSE_MODULE,A2.RESPONSE_MODULE) RESPONSE_MODULE
+            ,NVL(A1.MAJOR_REASON,A2.MAJOR_REASON)MAJOR_REASON ,NVL(A1.OVER_COMMENT,A2.OVER_COMMENT) OVER_COMMENT
+            ,A1.PLATFORM,A1.PRODSPEC_ID,A1.NENG_FLAG,A1.TARGET_TIME,A1.END_TIME,A1.LOOP1,A1.LOOP2,A1.QT_CONCERN,A1.SUB_LOT_TYPE
+            ,A1.LOT_FAB,A1.OVER_FAB,A1.ACTION,NVL(A1.REMARK,A2.REMARK) REMARK,A1.INSERT_TIME,A1.CLAIM_TIME
+            ,A1.CURRENT_MAINPD_ID,A1.TECH,A1.TARGET_MODULE,A2.MFG_OVER,A1.CROSS_FLAG
+            ,A1.TRIGGER_OPE_NO,A1.TARGET_OPE_NO,A1.FLOW_KEY
+            FROM A1MFG.QTIME_OVER_DAILY A1 LEFT JOIN A1MFG.QTIME_OVER_DAILY_COMM A2
+            ON A1.SHIFT_DATE=A2.SHIFT_DATE AND A1.LOT_ID=A2.LOT_ID AND A1.CURRENT_OPE_NO=A2.CURRENT_OPE_NO
+            )
+
+            WHERE CROSS_FLAG='N' AND QT_CONCERN='Y'
+            AND 1=1
+            AND SHIFT_DATE BETWEEN #{startdate} AND #{enddate}
+
+            <if test="nengflag == 'all'">
+                    AND NENG_FLAG LIKE '%'
+            </if>
+            <if test="nengflag != 'all'">
+                    AND NENG_FLAG=#{nengflag}
+            </if>
+
+
+
+            <if test="module == 'all'">
+                    AND (MODULE LIKE '%' OR MODULE IS NULL)
+            </if>
+            <if test="module == 'Measurement'">
+                    AND SUBSTR(CURRENT_OPE_NO,5,1)='Q'
+            </if>
+            <if test="module == 'WCS'">
+                    AND MODULE IN ('WET','CMP')
+            </if>
+            <if test="module != 'all' and module != 'Measurement' and module != 'WCS'">
+                    AND MODULE=#{module}
+            </if>
+
+
+
+            <if test="tech == 'all'">
+                    AND TECH LIKE '%'
+            </if>
+            <if test="tech != 'all'">
+                    AND TECH =#{tech}
+            </if>
+
+
+            <if test="targetmodule == 'all'">
+                    AND (TARGET_MODULE LIKE '%' OR TARGET_MODULE IS NULL)
+            </if>
+            <if test="targetmodule == 'Measurement'">
+                    AND SUBSTR(TARGET_OPE_NO,5,1)='Q'
+            </if>
+            <if test="targetmodule == 'WCS'">
+                    AND TARGET_MODULE IN ('WET','CMP')
+            </if>
+            <if test="targetmodule != 'all' and targetmodule != 'Measurement' and targetmodule != 'WCS'">
+                    AND TARGET_MODULE=#{targetmodule}
+            </if>
+
+
+
+            )A
+            ,(
+            SELECT SHIFT_DATE,SHIFT,AB_SHIFT,'42'||DECODE(SHIFT,'D','日','N','夜')||SUBSTR(AB_SHIFT,1,1)||'班' ACLASS
+            ,STARTDATETM STARTDATETM,ENDDATETM ENDDATETM FROM ODS.WP_CALENDAR
+            WHERE SHIFT_DATE BETWEEN #{startdate} AND #{enddate}
+            )B
+            WHERE A.CLAIM_TIME<![CDATA[>=B.STARTDATETM AND A.CLAIM_TIME<=]]>B.ENDDATETM
+            ORDER BY A.SHIFT_DATE DESC,A.INSERT_TIME DESC
+    </select>
+
+    <select id="getTechList" resultType="java.util.Map">
+            SELECT * FROM
+            (
+            SELECT 'all' TECH_VALUE,'ALL' TECH_LABEL  FROM DUAL
+            UNION ALL
+            SELECT DISTINCT TECH TECH_VALUE,TECH TECH_LABEL  FROM A1MFG.QTIME_OVER_DAILY
+            )
+            WHERE TECH_VALUE IS NOT NULL ORDER BY TECH_LABEL
+    </select>
+
+
+    <select id="getEditOption" resultType="java.util.Map">
+                SELECT DISTINCT KEY KEY_VALUE,KEY KEY_LABEL  FROM A1MFG.QTIME_OVER_MAINTAIN WHERE TYPE=#{type}
+    </select>
+
+    <update id="updateQtimeOverInfo">
+            UPDATE A1MFG.QTIME_OVER_DAILY SET ${TYPE}=#{KEYVALUE},REMARK=#{REMARK},UPDATE_USER=#{UPDATE_USER},UPDATE_TIME=SYSDATE
+            WHERE SHIFT_DATE=#{SHIFT_DATE} AND LOT_ID=#{LOT_ID} AND CURRENT_OPE_NO=#{CURRENT_OPE_NO}
+    </update>
+
+        <update id="updateQtimeOverModule">
+                MERGE INTO A1MFG.QTIME_OVER_DAILY_COMM  A
+                USING
+                (
+                SELECT #{SHIFT_DATE} SHIFT_DATE,#{LOT_ID} LOT_ID,#{CURRENT_OPE_NO} CURRENT_OPE_NO FROM DUAL
+                )B
+                ON (A.SHIFT_DATE=B.SHIFT_DATE AND A.LOT_ID=B.LOT_ID AND A.CURRENT_OPE_NO=B.CURRENT_OPE_NO)
+                WHEN MATCHED THEN
+                UPDATE SET RESPONSE_MODULE=#{KEYVALUE},REMARK=#{REMARK},UPDATE_USER=#{UPDATE_USER},UPDATE_TIME=SYSDATE
+                WHEN NOT MATCHED THEN
+                INSERT (SHIFT_DATE,LOT_ID,CURRENT_OPE_NO,RESPONSE_MODULE,REMARK,UPDATE_USER,UPDATE_TIME)
+                VALUES (#{SHIFT_DATE},#{LOT_ID},#{CURRENT_OPE_NO},#{KEYVALUE},#{REMARK},#{UPDATE_USER},SYSDATE)
+        </update>
+
+        <update id="updateQtimeOverReason">
+                MERGE INTO A1MFG.QTIME_OVER_DAILY_COMM  A
+                USING
+                (
+                SELECT #{SHIFT_DATE} SHIFT_DATE,#{LOT_ID} LOT_ID,#{CURRENT_OPE_NO} CURRENT_OPE_NO FROM DUAL
+                )B
+                ON (A.SHIFT_DATE=B.SHIFT_DATE AND A.LOT_ID=B.LOT_ID AND A.CURRENT_OPE_NO=B.CURRENT_OPE_NO)
+                WHEN MATCHED THEN
+                UPDATE SET MAJOR_REASON=#{KEYVALUE},REMARK=#{REMARK},UPDATE_USER=#{UPDATE_USER},UPDATE_TIME=SYSDATE
+                WHEN NOT MATCHED THEN
+                INSERT (SHIFT_DATE,LOT_ID,CURRENT_OPE_NO,MAJOR_REASON,REMARK,UPDATE_USER,UPDATE_TIME)
+                VALUES (#{SHIFT_DATE},#{LOT_ID},#{CURRENT_OPE_NO},#{KEYVALUE},#{REMARK},#{UPDATE_USER},SYSDATE)
+        </update>
+
+        <update id="updateQtimeOverComment">
+                MERGE INTO A1MFG.QTIME_OVER_DAILY_COMM  A
+                USING
+                (
+                SELECT #{SHIFT_DATE} SHIFT_DATE,#{LOT_ID} LOT_ID,#{CURRENT_OPE_NO} CURRENT_OPE_NO FROM DUAL
+                )B
+                ON (A.SHIFT_DATE=B.SHIFT_DATE AND A.LOT_ID=B.LOT_ID AND A.CURRENT_OPE_NO=B.CURRENT_OPE_NO)
+                WHEN MATCHED THEN
+                UPDATE SET OVER_COMMENT=#{KEYVALUE},REMARK=#{REMARK},UPDATE_USER=#{UPDATE_USER},UPDATE_TIME=SYSDATE
+                WHEN NOT MATCHED THEN
+                INSERT (SHIFT_DATE,LOT_ID,CURRENT_OPE_NO,OVER_COMMENT,REMARK,UPDATE_USER,UPDATE_TIME)
+                VALUES (#{SHIFT_DATE},#{LOT_ID},#{CURRENT_OPE_NO},#{KEYVALUE},#{REMARK},#{UPDATE_USER},SYSDATE)
+        </update>
+
+        <update id="updateQtimeMFG">
+                MERGE INTO A1MFG.QTIME_OVER_DAILY_COMM  A
+                USING
+                (
+                SELECT #{SHIFT_DATE} SHIFT_DATE,#{LOT_ID} LOT_ID,#{CURRENT_OPE_NO} CURRENT_OPE_NO FROM DUAL
+                )B
+                ON (A.SHIFT_DATE=B.SHIFT_DATE AND A.LOT_ID=B.LOT_ID AND A.CURRENT_OPE_NO=B.CURRENT_OPE_NO)
+                WHEN MATCHED THEN
+                UPDATE SET MFG_OVER=#{KEYVALUE},REMARK=#{REMARK},UPDATE_USER=#{UPDATE_USER},UPDATE_TIME=SYSDATE
+                WHEN NOT MATCHED THEN
+                INSERT (SHIFT_DATE,LOT_ID,CURRENT_OPE_NO,MFG_OVER,REMARK,UPDATE_USER,UPDATE_TIME)
+                VALUES (#{SHIFT_DATE},#{LOT_ID},#{CURRENT_OPE_NO},#{KEYVALUE},#{REMARK},#{UPDATE_USER},SYSDATE)
+        </update>
+
+        <select id="getQtimeOverReason" resultType="java.util.Map">
+                SELECT * FROM A1MFG.QTIME_OVER_MAINTAIN
+                ORDER BY TYPE
+        </select>
+
+        <delete id="deleteQtimeOverReason" >
+                DELETE FROM A1MFG.QTIME_OVER_MAINTAIN  WHERE KEY = #{key} AND TYPE= #{type}
+        </delete>
+
+        <insert id="insertQtimeOverReason">
+                INSERT INTO A1MFG.QTIME_OVER_MAINTAIN
+                VALUES (
+                  #{key,javaType=String,jdbcType=VARCHAR}
+                , #{type,javaType=String,jdbcType=VARCHAR}
+                , SYSDATE
+                , #{updateUser,javaType=String,jdbcType=VARCHAR}
+                )
+        </insert>
+
+        <select id="getSumReport" resultType="java.util.Map">
+                SELECT * FROM
+                (
+                SELECT NULL LOT_ID,NULL OPE_NO,NULL PRODG,EQP_ID EQP,NULL SPEC,NULL SHIFT_DATE
+                ,ROW_NUMBER() OVER(ORDER BY T.CLAIM_TIME DESC) RN
+                FROM ODS.MOVE_HISTORY T WHERE T.LOT_ID =#{lot_id} AND T.OPE_NO =#{ope_no} AND OPE_CATEGORY='OperationComplete'
+                ) WHERE RN=1
+        </select>
+
+        <select id="getQtimeDetail" resultType="java.util.Map">
+                SELECT S1.*,S2.CLAIM_TIME HOLD_B_TIME,S2.RELEASE_TIME,S2.HOLD_COMMENT,S2.HOLD_CODE,S2.HOLDER,S2.HOLD_TIME2,
+                ROUND(S3.TM,2)TM,ROUND(S3.TP,2)TP,ROUND(S3.TQ,2)TQ
+                ,CASE WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QA' THEN 1
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QB' THEN 3
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QC' THEN 1
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QE' THEN 1
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QF' THEN 30
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QG' THEN 3
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QH' THEN 0.4
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QJ' THEN 1
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QM' THEN 2
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QP' THEN 2
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QR' THEN 20
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QS' THEN 1
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QV' THEN 30
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QW' THEN 1
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QX' THEN 1
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QY' THEN 1
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QZ' THEN 6
+                ELSE NVL(S3.CT,0) END CT
+                ,NVL(S4.EQP_COUNT,0)EQP_COUNT,
+                CASE WHEN S1.OPER_NO LIKE 'XX%' THEN S1.LOT_ID ELSE 'NORMAL' END LOT_PATH
+                ,S1.CYCLE_TIME-
+                (
+                CASE WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QA' THEN 1
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QB' THEN 3
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QC' THEN 1
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QE' THEN 1
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QF' THEN 30
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QG' THEN 3
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QH' THEN 0.4
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QJ' THEN 1
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QM' THEN 2
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QP' THEN 2
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QR' THEN 20
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QS' THEN 1
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QV' THEN 30
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QW' THEN 1
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QX' THEN 1
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QY' THEN 1
+                WHEN S1.OPER_NO LIKE 'XX%' AND SUBSTR(S1.OPER_NO,5,2)='QZ' THEN 6
+                ELSE NVL(S3.CT,0) END
+                )
+                DIFF
+                ,S5.COMM MEMO,S6.COMM
+                FROM (
+                SELECT P1.PRODG1,NVL(P1.FUTURE_FLAG,0)FUTURE_FLAG,NVL(P1.LOT_ID,P2.LOT_ID)LOT_ID,#{tri_openo} TRIGGER_OPE_NO,#{tar_openo} TARGET_OPE_NO,#{qtime_grage} QT_GRADE,#{qtime_spec} QTIME_SPEC,
+                NVL(P1.OPER_NO,P2.OPE_NO) OPER_NO,NVL(P1.CLAIM_TIME,P2.COMPLETE_TIME)CLAIM_TIME,NVL(P1.OPER_SEQ,P2.OPE_SEQ)OPER_SEQ,
+                NVL(P1.MOVE_LOCATION,P2.LOCATION)MOVE_LOCATION,P2.RUN_TIME,P2.HOLD_TIME,P2.WAIT_TIME,P2.BANK_TIME,P2.CYCLE_TIME,P2.PASS_COUNT,P2.MAINPD_ID,
+                NVL(P1.PRODSPEC_ID,P2.PRODSPEC_ID)PRODSPEC_ID,P1.LOT_PROC_STATE,P1.DUR
+                FROM (
+                SELECT T1.FAB,T1.LOCATION,T1.LOT_ID,T1.PRODG1,T1.TECH,T1.PRODSPEC_ID,T1.MAINPD_ID,T1.WAFER_QTY,T1.OPE_NO,T1.EQP_ID,
+                T1.TRIGGER_OPE_NO,T1.TARGET_OPE_NO,T1.OPER_NO,T1.OPER_SEQ,T1.ROUTEID,T1.ACT_CT,T1.MOVE_LOCATION,
+                T1.MIN_CLAIM_TIME,T1.CLAIM_TIME,T1.FUTURE_FLAG,T1.QTIME_SPEC,T1.QT_GRADE,
+                CASE WHEN T1.FUTURE_FLAG=1 AND LAG(T1.FUTURE_FLAG)OVER(PARTITION BY T1.LOT_ID,T1.TRIGGER_OPE_NO,T1.TARGET_OPE_NO ORDER BY T1.OPER_SEQ)=0
+                THEN T1.LOT_PROC_STATE ELSE NULL END LOT_PROC_STATE,
+                CASE WHEN T1.FUTURE_FLAG=1 AND LAG(T1.FUTURE_FLAG)OVER(PARTITION BY T1.LOT_ID,T1.TRIGGER_OPE_NO,T1.TARGET_OPE_NO ORDER BY T1.OPER_SEQ)=0
+                THEN T1.DUR ELSE NULL END DUR
+                FROM(
+                SELECT FAB,LOCATION,LOT_ID,PRODG1,SUBSTR(PRODG1,1,3)TECH,PRODSPEC_ID,LOT_PROC_STATE,MAINPD_ID,WAFER_QTY,OPE_NO,EQP_ID,CLAIM_TIME,ACT_CT,
+                MIN_CLAIM_TIME,DUR,TRIGGER_OPE_NO,TARGET_OPE_NO,QTIME_SPEC,OPER_NO,OPER_SEQ,SUBSTR(MAINPD_ID,1,INSTR(MAINPD_ID,'.')-1) ROUTEID,
+                MOVE_LOCATION,QT_GRADE,FUTURE_FLAG
+                FROM(
+                SELECT FAB,LOCATION,LOT_ID,PRODG1,PRODSPEC_ID,LOT_PROC_STATE,MAINPD_ID,WAFER_QTY,OPE_NO,EQP_ID,DUR,TRIGGER_OPE_NO,FUTURE_FLAG,
+                TARGET_OPE_NO,QTIME_SPEC,OPER_NO,OPER_SEQ,QT_GRADE,CLAIM_TIME,ROUND((CLAIM_TIME-PREV_OP_COMP_TIME)*24,2) ACT_CT,MOVE_LOCATION,
+                MIN(CLAIM_TIME)OVER(ORDER BY CLAIM_TIME) MIN_CLAIM_TIME
+                FROM(
+                SELECT C.FAB,C.LOCATION,C.LOT_ID,C.PRODG1,C.PRODSPEC_ID,C.LOT_PROC_STATE,C.MAINPD_ID,C.WAFER_QTY,C.OPE_NO,
+                C.DUR,C.TRIGGER_OPE_NO,C.TARGET_OPE_NO,C.QTIME_SPEC,C.REMAIN_QTIME,C.OPER_NO,C.OPER_SEQ,
+                C.QT_GRADE,NVL(D.CLAIM_TIME,E.CLAIM_TIME) CLAIM_TIME,
+                NVL(NVL(D.EQP_ID,E.EQP_ID),C.EQP_ID)EQP_ID,NVL(D.PREV_OP_COMP_TIME,E.PREV_OP_COMP_TIME) PREV_OP_COMP_TIME,
+                CASE WHEN D.LOT_ID IS NOT NULL THEN 'N1A1' WHEN E.LOT_ID IS NOT NULL THEN 'N1A3' END MOVE_LOCATION,
+                CASE WHEN NVL(D.CLAIM_TIME,E.CLAIM_TIME) IS NULL THEN 1 ELSE 0 END FUTURE_FLAG
+                FROM (
+                SELECT A.FAB,A.LOCATION,A.LOT_ID,C.PRODG1,A.PRODSPEC_ID,A.LOT_PROC_STATE,A.WAFER_QTY,A.OPE_NO,A.EQP_ID,
+                A.DUR,A.TRIGGER_OPE_NO,A.TARGET_OPE_NO,A.QTIME_SPEC,NULL REMAIN_QTIME,B.OPER_NO,B.OPER_SEQ,
+                CASE WHEN A.OPE_NO=B.OPER_NO THEN B.OPER_SEQ ELSE 0 END OPE_SEQ,A.QT_GRADE,
+                CASE WHEN A.OPE_NO LIKE 'XX%' OR A.OPE_NO LIKE '%R' THEN A3MFGYW1.GET_LAST_MAINPDID(A.LOT_ID) ELSE A.MAINPD_ID END MAINPD_ID
+                FROM (
+                SELECT #{tri_openo}  TRIGGER_OPE_NO,#{tar_openo} TARGET_OPE_NO,#{qtime_grage} QT_GRADE,#{qtime_spec} QTIME_SPEC,FAB,LOCATION,LOT_ID,PRODSPEC_ID,MAINPD_ID,WAFER_QTY,OPE_NO,NENG_FLAG,EQP_ID,
+                DECODE(LOT_PROC_STATE,'OnHold','Hold','Processing','Proc','Waiting','Wait') LOT_PROC_STATE,
+                CASE WHEN <![CDATA[LOT_PROC_STATE<>'Processing']]> THEN ROUND((SYSDATE-LAST_CLAIM_TIME)*24,1) ELSE NULL END DUR
+                FROM A3MFGYW1.V_LOT_SUMMARY_ALL
+                WHERE LOT_ID=#{lotid}
+                )A,
+                RTD.QTIME_FLOW@A1PDW B,
+                PWEB.PRODUCT@A1PDW C
+                WHERE A.PRODSPEC_ID=B.PRODSPEC_ID(+) AND A.TRIGGER_OPE_NO=B.FROM_OPE_NO(+) AND A.TARGET_OPE_NO=B.TO_OPE_NO(+)
+                AND A.PRODSPEC_ID=C.PRODSPEC_ID(+)
+                )C,
+                ODS.MOVE_HISTORY@A1PDW D,
+                ODS.MOVE_HISTORY@A3PDW E
+                WHERE C.LOT_ID=D.LOT_ID(+) AND C.OPER_NO=D.OPE_NO(+)
+                AND C.LOT_ID=E.LOT_ID(+) AND C.OPER_NO=E.OPE_NO(+)
+                )
+                )
+                )T1
+                )P1
+                FULL JOIN
+                (
+                SELECT Y1.*
+                FROM (
+                SELECT LOCATION,SHIFT_DATE,LOT_ID,MAINPD_ID,PASS_COUNT,OPE_NO,OPE_SEQ,START_TIME,COMPLETE_TIME,OP_LAST_COMPLETE_TIME,
+                ROUND(CYCLE_TIME*24,2) CYCLE_TIME,ROUND(STAY_TIME*24,2) STAY_TIME,ROUND(RUN_TIME*24,2) RUN_TIME,ROUND(BANK_TIME*24,2) BANK_TIME,
+                GREATEST(ROUND(HOLD_TIME*24,2),0) HOLD_TIME,GREATEST(ROUND(WAIT_TIME*24,2),0) WAIT_TIME,EQP_ID,PRODSPEC_ID,WAFER_QTY
+                FROM (
+                SELECT T1.LOCATION,T1.SHIFT_DATE,T1.LOT_ID,T1.MAINPD_ID,T1.OPE_NO,T1.PASS_COUNT,T1.START_TIME,T1.COMPLETE_TIME,T1.OP_LAST_COMPLETE_TIME,
+                T1.OPE_SEQ,NVL(T1.BANK_TIME3,0) BANK_TIME,T1.RUN_TIME,T1.CYCLE_TIME,T1.STAY_TIME,
+                NVL(T2.HOLD_TIME,0)-NVL(T1.BANK_TIME3,0) HOLD_TIME,T1.STAY_TIME-NVL(T2.HOLD_TIME,0) WAIT_TIME,
+                T1.EQP_ID,T1.PRODSPEC_ID,T1.WAFER_QTY,T1.PREV_OP_COMP_TIME
+                FROM (
+                SELECT LOCATION,SHIFT_DATE,LOT_ID,OPE_NO,COMPLETE_TIME,EQP_ID,PRODSPEC_ID,WAFER_QTY,START_TIME,PREV_OP_COMP_TIME,LAST_COMPLETE_TIME,BANK_TIME2,
+                OPE_SEQ,PASS_COUNT,CASE WHEN LAG(BANK_TIME2)OVER(PARTITION BY LOT_ID ORDER BY COMPLETE_TIME,PREV_OP_COMP_TIME) IS NOT NULL
+                THEN LAG(BANK_TIME2)OVER(PARTITION BY LOT_ID ORDER BY COMPLETE_TIME,PREV_OP_COMP_TIME) ELSE NULL END BANK_TIME3,
+                OP_LAST_COMPLETE_TIME,RUN_TIME,CYCLE_TIME,STAY_TIME,MAINPD_ID
+                FROM (
+                SELECT LOCATION,SHIFT_DATE,LOT_ID,OPE_NO,COMPLETE_TIME,EQP_ID,PRODSPEC_ID,WAFER_QTY,START_TIME,PREV_OP_COMP_TIME,
+                LAST_COMPLETE_TIME,MAINPD_ID,NVL(OP_LAST_COMPLETE_TIME,PREV_OP_COMP_TIME) OP_LAST_COMPLETE_TIME,
+                OPE_SEQ,PASS_COUNT,CASE WHEN OPE_NO='NonProBankOut' THEN COMPLETE_TIME-LAST_COMPLETE_TIME END BANK_TIME2,
+                COMPLETE_TIME-START_TIME RUN_TIME,COMPLETE_TIME-NVL(OP_LAST_COMPLETE_TIME,PREV_OP_COMP_TIME) CYCLE_TIME,
+                START_TIME-NVL(OP_LAST_COMPLETE_TIME,PREV_OP_COMP_TIME) STAY_TIME,OP_FLAG
+                FROM (
+                SELECT LOCATION,SHIFT_DATE,LOT_ID,OPE_NO,COMPLETE_TIME,EQP_ID,PRODSPEC_ID,WAFER_QTY,START_TIME,PREV_OP_COMP_TIME,MAINPD_ID,
+                OPE_SEQ,PASS_COUNT,LAG(COMPLETE_TIME)OVER(PARTITION BY LOT_ID ORDER BY COMPLETE_TIME,PREV_OP_COMP_TIME) LAST_COMPLETE_TIME,
+                LAG(OP_COMPLETE_TIME IGNORE NULLS)OVER(PARTITION BY LOT_ID ORDER BY COMPLETE_TIME,PREV_OP_COMP_TIME NULLS FIRST) OP_LAST_COMPLETE_TIME,
+                CASE WHEN <![CDATA[LENGTH(OPE_NO)<>8 THEN]]> 0 ELSE 1 END OP_FLAG
+                FROM (
+                SELECT LOCATION,SHIFT_DATE,LOT_ID,OPE_NO,MAINPD_ID,COMPLETE_TIME,PASS_COUNT,OPE_SEQ,
+                CASE WHEN OPE_NO NOT IN ('NonProBankIn','NonProBankOut') THEN A.COMPLETE_TIME END OP_COMPLETE_TIME,
+                EQP_ID,PRODSPEC_ID,WAFER_QTY,NVL(A.START_TIME,A.COMPLETE_TIME) START_TIME,PREV_OP_COMP_TIME
+                FROM A3MFGYW1.V_MOVE_SUMMARY A
+                WHERE LOT_ID=#{lotid}
+                )
+                )
+                )
+                WHERE OP_FLAG=1
+                )T1,
+                (
+                SELECT MAINPD_ID,OPE_NO,PASS_COUNT,SUM(HOLD_TIME)HOLD_TIME
+                FROM (
+                SELECT MAINPD_ID,OPE_NO,PASS_COUNT,TIME_GROUP,MAX(RELEASE_TIME)-MIN(CLAIM_TIME) HOLD_TIME
+                FROM (
+                SELECT MAINPD_ID,LOT_ID,OPE_NO,PASS_COUNT,CLAIM_TIME,RELEASE_TIME,START_FLAG,
+                SUM(START_FLAG)OVER(PARTITION BY MAINPD_ID,OPE_NO,PASS_COUNT ORDER BY CLAIM_TIME,RELEASE_TIME) AS TIME_GROUP
+                FROM (
+                SELECT X1.MAINPD_ID,X1.LOT_ID,X1.OPE_NO,X1.PASS_COUNT,X1.COMPLETE_TIME,X2.CLAIM_TIME,X2.RELEASE_TIME,X2.RESPONSIBLE_OPE_NO,
+                CASE WHEN MAX(X2.RELEASE_TIME)OVER(PARTITION BY MAINPD_ID,OPE_NO,PASS_COUNT ORDER BY X2.CLAIM_TIME,X2.RELEASE_TIME
+                ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING)>=X2.CLAIM_TIME THEN 0 ELSE 1 END AS START_FLAG
+                FROM (
+                SELECT LOCATION,SHIFT_DATE,LOT_ID,OPE_NO,COMPLETE_TIME,EQP_ID,PRODSPEC_ID,WAFER_QTY,START_TIME,PREV_OP_COMP_TIME,
+                PASS_COUNT,LAST_COMPLETE_TIME,MAINPD_ID,NVL(OP_LAST_COMPLETE_TIME,PREV_OP_COMP_TIME) OP_LAST_COMPLETE_TIME,
+                COMPLETE_TIME-START_TIME RUN_TIME,COMPLETE_TIME-NVL(OP_LAST_COMPLETE_TIME,PREV_OP_COMP_TIME) CYCLE_TIME
+                FROM (
+                SELECT LOCATION,SHIFT_DATE,LOT_ID,OPE_NO,COMPLETE_TIME,EQP_ID,PRODSPEC_ID,WAFER_QTY,START_TIME,PREV_OP_COMP_TIME,MAINPD_ID,
+                PASS_COUNT,LAG(COMPLETE_TIME)OVER(PARTITION BY LOT_ID ORDER BY COMPLETE_TIME,PREV_OP_COMP_TIME) LAST_COMPLETE_TIME,
+                LAG(OP_COMPLETE_TIME IGNORE NULLS)OVER(PARTITION BY LOT_ID ORDER BY COMPLETE_TIME,PREV_OP_COMP_TIME) OP_LAST_COMPLETE_TIME,
+                CASE WHEN <![CDATA[LENGTH(OPE_NO)<>8 THEN]]> 0 ELSE 1 END OP_FLAG
+                FROM (
+                SELECT LOCATION,SHIFT_DATE,LOT_ID,OPE_NO,MAINPD_ID,COMPLETE_TIME,PASS_COUNT,OPE_SEQ,
+                CASE WHEN OPE_NO NOT IN ('NonProBankIn','NonProBankOut') THEN A.COMPLETE_TIME END OP_COMPLETE_TIME,
+                EQP_ID,PRODSPEC_ID,WAFER_QTY,NVL(A.START_TIME,A.COMPLETE_TIME) START_TIME,PREV_OP_COMP_TIME
+                FROM A3MFGYW1.V_MOVE_SUMMARY A
+                WHERE LOT_ID=#{lotid}
+                )
+                )
+                WHERE OP_FLAG=1
+                )X1,
+                (
+                SELECT LOCATION,LOT_ID,RESPONSIBLE_OPE_NO,CLAIM_TIME,NVL(RELEASE_TIME,SYSDATE) RELEASE_TIME,HOLD_COMMENT,HOLD_CODE,HOLDER
+                FROM A3MFGYW1.V_HOLD_SUMMARY
+                WHERE LOT_ID=#{lotid}
+                )X2
+                WHERE X2.CLAIM_TIME>=X1.OP_LAST_COMPLETE_TIME AND <![CDATA[X2.RELEASE_TIME<=X1.COMPLETE_TIME]]>
+                )
+                )
+                GROUP BY MAINPD_ID,OPE_NO,PASS_COUNT,TIME_GROUP
+                )
+                GROUP BY MAINPD_ID,OPE_NO,PASS_COUNT
+                )T2
+                WHERE T1.MAINPD_ID=T2.MAINPD_ID(+) AND T1.OPE_NO=T2.OPE_NO(+) AND T1.PASS_COUNT=T2.PASS_COUNT(+)
+                )
+                )Y1,
+                (
+                SELECT MIN(A.COMPLETE_TIME) MIN_TIME,MAX(OPE_NO)OPE_NO,
+                CASE WHEN MAX(A.COMPLETE_TIME)=MIN(A.COMPLETE_TIME) THEN SYSDATE ELSE MAX(A.COMPLETE_TIME) END MAX_TIME
+                FROM A3MFGYW1.V_MOVE_SUMMARY A
+                WHERE LOT_ID=#{lotid} AND OPE_NO IN (#{tri_openo},#{tar_openo})
+                )Y2
+                WHERE Y1.COMPLETE_TIME BETWEEN MIN_TIME AND MAX_TIME
+                )P2
+                ON P1.OPER_NO=P2.OPE_NO
+                )S1,
+                (
+                SELECT X1.LOCATION,X1.MAINPD_ID,X1.LOT_ID,X1.OPE_NO,X1.PASS_COUNT,X1.COMPLETE_TIME,X1.OP_LAST_COMPLETE_TIME,
+                X2.CLAIM_TIME,X2.RELEASE_TIME,X2.HOLD_COMMENT,X2.HOLD_CODE,X2.HOLDER,X2.RESPONSIBLE_OPE_NO,
+                ROUND((X2.RELEASE_TIME-X2.CLAIM_TIME)*24,2) HOLD_TIME2
+                FROM (
+                SELECT Y1.*
+                FROM (
+                SELECT LOCATION,SHIFT_DATE,LOT_ID,OPE_NO,COMPLETE_TIME,EQP_ID,PRODSPEC_ID,WAFER_QTY,START_TIME,PREV_OP_COMP_TIME,
+                PASS_COUNT,LAST_COMPLETE_TIME,MAINPD_ID,NVL(OP_LAST_COMPLETE_TIME,PREV_OP_COMP_TIME) OP_LAST_COMPLETE_TIME,
+                COMPLETE_TIME-START_TIME RUN_TIME,COMPLETE_TIME-NVL(OP_LAST_COMPLETE_TIME,PREV_OP_COMP_TIME) CYCLE_TIME
+                FROM (
+                SELECT LOCATION,SHIFT_DATE,LOT_ID,OPE_NO,COMPLETE_TIME,EQP_ID,PRODSPEC_ID,WAFER_QTY,START_TIME,PREV_OP_COMP_TIME,MAINPD_ID,
+                PASS_COUNT,LAG(COMPLETE_TIME)OVER(PARTITION BY LOT_ID ORDER BY COMPLETE_TIME,PREV_OP_COMP_TIME,OPE_SEQ) LAST_COMPLETE_TIME,
+                LAG(OP_COMPLETE_TIME IGNORE NULLS)OVER(PARTITION BY LOT_ID ORDER BY COMPLETE_TIME,PREV_OP_COMP_TIME,OPE_SEQ) OP_LAST_COMPLETE_TIME,
+                CASE WHEN <![CDATA[LENGTH(OPE_NO)<>8 THEN ]]> 0 ELSE 1 END OP_FLAG
+                FROM (
+                SELECT LOCATION,SHIFT_DATE,LOT_ID,OPE_NO,MAINPD_ID,COMPLETE_TIME,PASS_COUNT,OPE_SEQ,
+                CASE WHEN OPE_NO NOT IN ('NonProBankIn','NonProBankOut') THEN A.COMPLETE_TIME END OP_COMPLETE_TIME,
+                EQP_ID,PRODSPEC_ID,WAFER_QTY,NVL(A.START_TIME,A.COMPLETE_TIME) START_TIME,PREV_OP_COMP_TIME
+                FROM A3MFGYW1.V_MOVE_SUMMARY A
+                WHERE LOT_ID=#{lotid}
+                )
+                )
+                WHERE OP_FLAG=1
+                )Y1,
+                (
+                SELECT MIN(A.COMPLETE_TIME) MIN_TIME,MAX(OPE_NO)OPE_NO,
+                CASE WHEN MAX(A.COMPLETE_TIME)=MIN(A.COMPLETE_TIME) THEN SYSDATE ELSE MAX(A.COMPLETE_TIME) END MAX_TIME
+                FROM A3MFGYW1.V_MOVE_SUMMARY A
+                WHERE LOT_ID=#{lotid} AND OPE_NO IN (#{tri_openo},#{tar_openo})
+                )Y2
+                WHERE Y1.COMPLETE_TIME BETWEEN MIN_TIME AND MAX_TIME
+                )X1,
+                (
+                SELECT LOCATION,LOT_ID,RESPONSIBLE_OPE_NO,CLAIM_TIME,NVL(RELEASE_TIME,SYSDATE) RELEASE_TIME,HOLD_COMMENT,HOLD_CODE,HOLDER
+                FROM A3MFGYW1.V_HOLD_SUMMARY
+                WHERE LOT_ID=#{lotid}
+                )X2
+                WHERE X2.CLAIM_TIME>=X1.OP_LAST_COMPLETE_TIME  <![CDATA[AND X2.RELEASE_TIME<=X1.COMPLETE_TIME]]>
+                )S2,
+                (
+                SELECT * FROM A3MFGYW1.FLOW_STD_CYCLE_TIME
+                )S3,
+                A3MFGYW1.PATH_COUNT S4
+                ,(SELECT * FROM A1_MFG.QTIME_OVER_REPORT_COMM WHERE COMM_TYPE='OPE')S5
+                ,(SELECT * FROM A1_MFG.QTIME_OVER_REPORT_COMM WHERE COMM_TYPE='LOT')S6
+                WHERE S1.MAINPD_ID=S2.MAINPD_ID(+) AND S1.OPER_NO=S2.OPE_NO(+) AND S1.PASS_COUNT=S2.PASS_COUNT(+)
+                AND S1.MOVE_LOCATION=S3.FAB(+) AND S1.PRODG1=S3.PRODG1(+) AND S1.OPER_NO=S3.OPER_NO(+)
+                AND S1.PRODSPEC_ID=S4.PRODSPEC_ID(+) AND S1.MAINPD_ID=S4.MAINPD_ID(+) AND S1.OPER_NO=S4.OPE_NO(+)
+                AND S1.LOT_ID=S5.LOT_ID(+) AND S1.TRIGGER_OPE_NO=S5.TRIGGER_OPE_NO(+) AND S1.TARGET_OPE_NO=S5.TARGET_OPE_NO(+) AND S1.OPER_NO=S5.OPER_NO(+)
+                AND S1.LOT_ID=S6.LOT_ID(+) AND S1.TRIGGER_OPE_NO=S6.TRIGGER_OPE_NO(+) AND S1.TARGET_OPE_NO=S6.TARGET_OPE_NO(+)
+                AND S1.OPER_NO IS NOT NULL
+                ORDER BY S1.CLAIM_TIME,S1.OPER_SEQ
+        </select>
+
+        <select id="getCommByOpe" resultType="java.util.Map">
+                SELECT * FROM A1_MFG.QTIME_OVER_REPORT_COMM WHERE COMM_TYPE='OPE' AND LOT_ID=#{lotid} AND TRIGGER_OPE_NO=#{tri_openo} AND TARGET_OPE_NO=#{tar_openo} AND OPER_NO=#{ope_no}
+        </select>
+
+        <select id="getCommByLot" resultType="java.util.Map">
+                SELECT * FROM A1_MFG.QTIME_OVER_REPORT_COMM WHERE COMM_TYPE='LOT' AND LOT_ID=#{lotid} AND TRIGGER_OPE_NO=#{tri_openo} AND TARGET_OPE_NO=#{tar_openo}
+        </select>
+
+        <update id="updateQtimeOverMemo">
+                MERGE INTO A1_MFG.QTIME_OVER_REPORT_COMM  A
+                USING
+                (
+                SELECT #{lotid} LOT_ID,#{tri_openo} TRIGGER_OPE_NO,#{tar_openo} TARGET_OPE_NO,#{ope_no} OPER_NO,'OPE' COMM_TYPE FROM DUAL
+                )B
+                ON (A.LOT_ID=B.LOT_ID AND A.TRIGGER_OPE_NO=B.TRIGGER_OPE_NO AND A.TARGET_OPE_NO=B.TARGET_OPE_NO AND A.OPER_NO=B.OPER_NO AND A.COMM_TYPE=B.COMM_TYPE)
+                WHEN MATCHED THEN
+                UPDATE SET COMM=#{memo},UPDATE_USER=#{UPDATE_USER},UPDATE_TIME=SYSDATE
+                WHEN NOT MATCHED THEN
+                INSERT (LOT_ID,TRIGGER_OPE_NO,TARGET_OPE_NO,OPER_NO,COMM_TYPE,COMM,UPDATE_USER,UPDATE_TIME)
+                VALUES (#{lotid},#{tri_openo},#{tar_openo},#{ope_no},'OPE',#{memo},#{UPDATE_USER},SYSDATE)
+        </update>
+
+        <update id="updateQtimeOverComm">
+                MERGE INTO A1_MFG.QTIME_OVER_REPORT_COMM  A
+                USING
+                (
+                SELECT #{lotid} LOT_ID,#{tri_openo} TRIGGER_OPE_NO,#{tar_openo} TARGET_OPE_NO,'LOT' COMM_TYPE FROM DUAL
+                )B
+                ON (A.LOT_ID=B.LOT_ID AND A.TRIGGER_OPE_NO=B.TRIGGER_OPE_NO AND A.TARGET_OPE_NO=B.TARGET_OPE_NO  AND A.COMM_TYPE=B.COMM_TYPE)
+                WHEN MATCHED THEN
+                UPDATE SET COMM=#{comment},UPDATE_USER=#{UPDATE_USER},UPDATE_TIME=SYSDATE
+                WHEN NOT MATCHED THEN
+                INSERT (LOT_ID,TRIGGER_OPE_NO,TARGET_OPE_NO,COMM_TYPE,COMM,UPDATE_USER,UPDATE_TIME)
+                VALUES (#{lotid},#{tri_openo},#{tar_openo},'LOT',#{comment},#{UPDATE_USER},SYSDATE)
+        </update>
+
+        <select id="getQtimefLOW" resultType="java.util.Map">
+                SELECT A.PRODSPEC_ID,A.FLOW_KEY,A.FROM_OPE_NO,A.TO_OPE_NO,A.OPER_NO,A.OPER_SEQ
+                ,CASE WHEN A.OPER_SEQ=A.FROM_OPE_SEQ AND B.PRODSPEC_ID IS NOT NULL THEN '*'||A.QTIME_SPEC
+                WHEN A.OPER_SEQ=A.TO_OPE_SEQ AND C.PRODSPEC_ID IS NOT NULL THEN A.QTIME_SPEC||TO_CHAR(A.QTIME_LIMIT)
+                ELSE A.QTIME_SPEC END QTIME_SPEC
+                FROM
+                (
+                SELECT PRODSPEC_ID,FLOW_KEY,FROM_OPE_NO,TO_OPE_NO,OPER_NO,OPER_SEQ,QTIME_LIMIT,FROM_OPE_SEQ,TO_OPE_SEQ
+                ,CASE WHEN OPER_SEQ=FROM_OPE_SEQ THEN TO_CHAR(QTIME_LIMIT)
+                WHEN OPER_SEQ=TO_OPE_SEQ THEN '*' ELSE NULL END QTIME_SPEC
+                FROM PWEB.QTIME_FLOW
+                WHERE PRODSPEC_ID=#{prodspec_ID} AND FLOW_KEY=#{flow_KEY} AND FROM_OPE_NO=#{tri_openo}
+                AND TO_OPE_NO=#{tar_openo}
+                )A
+                LEFT JOIN
+                (
+                SELECT PRODSPEC_ID,FLOW_KEY  FROM PWEB.QTIME_FLOW
+                WHERE PRODSPEC_ID=#{prodspec_ID} AND FLOW_KEY=#{flow_KEY} AND TO_OPE_NO=#{tri_openo}
+                GROUP BY PRODSPEC_ID,FLOW_KEY
+                )B
+                ON A.PRODSPEC_ID=B.PRODSPEC_ID AND A.FLOW_KEY=B.FLOW_KEY
+                LEFT JOIN
+                (
+                SELECT PRODSPEC_ID,FLOW_KEY FROM PWEB.QTIME_FLOW
+                WHERE PRODSPEC_ID=#{prodspec_ID} AND FLOW_KEY=#{flow_KEY} AND FROM_OPE_NO=#{tar_openo}
+                GROUP BY PRODSPEC_ID,FLOW_KEY
+                )C
+                ON A.PRODSPEC_ID=C.PRODSPEC_ID AND A.FLOW_KEY=C.FLOW_KEY
+                ORDER BY A.OPER_SEQ
+        </select>
+
+
+
+</mapper>
